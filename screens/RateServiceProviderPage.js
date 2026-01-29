@@ -8,6 +8,10 @@ import {
   SafeAreaView,
   Alert,
   Image,
+  StatusBar,
+  Platform,
+  ScrollView, // Imported ScrollView
+  KeyboardAvoidingView, // Added for better input handling
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -17,16 +21,14 @@ const RateServiceProviderPage = ({ navigation, route }) => {
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState("");
 
-  // Extract service provider details from route params
   const {
-    providerName = "Service Provider", // Default value if undefined
-    avatar = "https://via.placeholder.com/150", // Fallback image
+    providerName = "Service Provider",
+    avatar = "https://via.placeholder.com/150",
     serviceName = "Service Name",
     bookingId,
     totalPrice = "N/A",
   } = route.params || {};
 
-  // Validate route parameters
   if (!bookingId) {
     navigation.navigate("Home");
     return null;
@@ -36,11 +38,11 @@ const RateServiceProviderPage = ({ navigation, route }) => {
 
   const handleSubmit = async () => {
     if (!rating) {
-      Alert.alert("Please select a rating.");
+      Alert.alert("Rating Required", "Please select a star rating.");
       return;
     }
     if (!feedback.trim()) {
-      Alert.alert("Please provide your feedback.");
+      Alert.alert("Feedback Required", "Please let us know how the service was.");
       return;
     }
 
@@ -61,71 +63,45 @@ const RateServiceProviderPage = ({ navigation, route }) => {
         navigation.reset({
           index: 0,
           routes: [{ name: "Home" }],
-        }); // Ensure user doesn't get sent back to the review screen
-      }
-      else {
+        });
+      } else {
         Alert.alert("Error", response.data.message || "Failed to submit review.");
       }
     } catch (error) {
-      console.error("Error submitting review:", error);
-      Alert.alert(
-        "Error",
-        error.response?.data?.message || "An error occurred while submitting the review."
-      );
+      Alert.alert("Error", error.response?.data?.message || "Connection error.");
     }
   };
 
   const handleNotNow = async () => {
     try {
       const token = await AsyncStorage.getItem("authToken");
-  
-      // Check if the token is available
       if (!token) {
         navigation.navigate("Login");
         return;
       }
-  
-      // Send the request to the server to skip the review
       const response = await axios.post(
         `https://service-booking-backend-eb9i.onrender.com/api/reviews/skip`,
-        { bookingId }, // Pass the bookingId to identify the specific booking
-        { headers: { Authorization: `Bearer ${token}` } } // Pass the token in the headers
+        { bookingId },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-  
-      // Handle server response
+
       if (response.data.success) {
-        navigation.navigate("Home"); // Navigate the user back to the Home screen
-      } else {
-        Alert.alert(
-          "Error",
-          response.data.message || "Failed to skip the review. Please try again."
-        );
+        navigation.navigate("Home");
       }
     } catch (error) {
-      console.error("Error skipping review:", error);
-  
-      // Handle specific error response from the server
-      Alert.alert(
-        "Error",
-        error.response?.data?.message || "An error occurred while skipping the review. Please try again."
-      );
+      navigation.navigate("Home");
     }
   };
-  
 
   const renderStars = (currentRating) => {
     const stars = [];
     for (let i = 1; i <= 5; i++) {
       stars.push(
-        <TouchableOpacity
-          key={i}
-          onPress={() => handleRatingPress(i)}
-          activeOpacity={0.8}
-        >
+        <TouchableOpacity key={i} onPress={() => handleRatingPress(i)} activeOpacity={0.7}>
           <Icon
             name={i <= currentRating ? "star" : "star-outline"}
-            size={32}
-            color="#FFD700"
+            size={42}
+            color={i <= currentRating ? "#FFA000" : "#CBD5E0"}
             style={styles.starIcon}
           />
         </TouchableOpacity>
@@ -136,52 +112,69 @@ const RateServiceProviderPage = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      
+      {/* Fixed Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-back" size={24} color="#fff" />
+          <Icon name="arrow-back-ios" size={20} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Rate Service Provider</Text>
+        <Text style={styles.headerTitle}>Rate Your Experience</Text>
       </View>
 
-      {/* Service Provider Profile Section */}
-      <View style={styles.profileSection}>
-        <Image
-          source={{
-            uri: avatar && avatar.startsWith("http")
-              ? avatar
-              : `https://service-booking-backend-eb9i.onrender.com/${avatar.replace(/\\/g, "/") || "uploads/default-profile.png"}`,
-          }}
-          style={styles.avatar}
-        />
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {/* Provider Profile Card */}
+          <View style={styles.profileSection}>
+            <Image
+              source={{
+                uri: avatar && avatar.startsWith("http")
+                  ? avatar
+                  : `https://service-booking-backend-eb9i.onrender.com/${avatar.replace(/\\/g, "/") || "uploads/default-profile.png"}`,
+              }}
+              style={styles.avatar}
+            />
+            <View style={styles.providerDetails}>
+              <Text style={styles.providerName}>{providerName}</Text>
+              <Text style={styles.serviceText}>{serviceName}</Text>
+              <View style={styles.priceTag}>
+                <Text style={styles.priceText}>Paid: NAD {totalPrice}</Text>
+              </View>
+            </View>
+          </View>
 
-        <View style={styles.providerDetails}>
-          <Text style={styles.providerName}>{providerName}</Text>
-          <Text style={styles.serviceText}>{serviceName}</Text>
-          <Text style={styles.priceText}>NAD {totalPrice}</Text>
-        </View>
-      </View>
+          {/* Input Section */}
+          <View style={styles.inputArea}>
+            <Text style={styles.sectionTitle}>How was your service?</Text>
+            <View style={styles.starsContainer}>{renderStars(rating)}</View>
 
-      <View style={styles.content}>
-        <Text style={styles.sectionTitle}>Your Rating</Text>
-        <View style={styles.starsContainer}>{renderStars(rating)}</View>
+            <Text style={styles.sectionTitle}>Detailed Feedback</Text>
+            <TextInput
+              style={styles.feedbackInput}
+              placeholder="Share your thoughts about the service provider..."
+              placeholderTextColor="#A0AEC0"
+              value={feedback}
+              onChangeText={setFeedback}
+              multiline
+              textAlignVertical="top"
+            />
 
-        <Text style={styles.sectionTitle}>Your Feedback</Text>
-        <TextInput
-          style={styles.feedbackInput}
-          placeholder="Write your feedback..."
-          value={feedback}
-          onChangeText={setFeedback}
-          multiline
-        />
+            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+              <Text style={styles.submitButtonText}>Submit Review</Text>
+            </TouchableOpacity>
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>Submit</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.notNowButton} onPress={handleNotNow}>
-          <Text style={styles.notNowButtonText}>Not Now</Text>
-        </TouchableOpacity>
-      </View>
+            <TouchableOpacity style={styles.notNowButton} onPress={handleNotNow}>
+              <Text style={styles.notNowButtonText}>Maybe Later</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -189,104 +182,126 @@ const RateServiceProviderPage = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9ff",
+    backgroundColor: "#F8F9FD",
   },
   header: {
     backgroundColor: "#1a237e",
-    paddingTop: 60,
-    paddingBottom: 20,
+    paddingTop: Platform.OS === 'ios' ? 20 : 60, 
+    paddingBottom: 40, // Increased to account for the card overlap
     paddingHorizontal: 20,
     flexDirection: "row",
     alignItems: "center",
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    zIndex: 10,
   },
   backButton: {
-    marginRight: 16,
+    padding: 8,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: "700",
+    fontSize: 22,
+    fontWeight: "800",
     color: "#ffffff",
+    marginLeft: 10,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40, // Space at the bottom so buttons aren't flush with the edge
   },
   profileSection: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#ffffff",
-    padding: 16,
-    margin: 16,
-    borderRadius: 12,
-    elevation: 2,
+    padding: 20,
+    borderRadius: 20,
+    marginTop: -25, // Overlap the header
+    elevation: 8,
+    shadowColor: "#1a237e",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
   },
   avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    marginRight: 16,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    marginRight: 15,
+    backgroundColor: '#eee',
   },
   providerDetails: {
     flex: 1,
   },
   providerName: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#1a237e",
   },
   serviceText: {
-    fontSize: 16,
-    color: "#4F4F4F",
-    marginVertical: 4,
+    fontSize: 14,
+    color: "#718096",
+    marginTop: 2,
+  },
+  priceTag: {
+    backgroundColor: "#E8F5E9",
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginTop: 6,
   },
   priceText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1a237e",
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#2E7D32",
   },
-  content: {
-    padding: 16,
+  inputArea: {
+    marginTop: 30,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#1a237e",
-    marginBottom: 8,
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#2D3748",
+    marginBottom: 12,
   },
   starsContainer: {
     flexDirection: "row",
-    marginBottom: 16,
+    justifyContent: 'center',
+    marginBottom: 30,
   },
   starIcon: {
     marginHorizontal: 4,
   },
   feedbackInput: {
     backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 15,
+    padding: 15,
     fontSize: 16,
-    height: 100,
+    height: 150, // Increased height for better typing experience
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    marginBottom: 16,
+    borderColor: "#E2E8F0",
+    marginBottom: 25,
+    color: '#2D3748',
   },
   submitButton: {
     backgroundColor: "#1a237e",
-    paddingVertical: 14,
-    borderRadius: 8,
+    paddingVertical: 16,
+    borderRadius: 15,
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 12,
   },
   submitButtonText: {
     fontSize: 16,
     color: "#fff",
-    fontWeight: "600",
+    fontWeight: "700",
   },
   notNowButton: {
-    backgroundColor: "#e0e0e0",
-    paddingVertical: 14,
-    borderRadius: 8,
+    paddingVertical: 16,
+    borderRadius: 15,
     alignItems: "center",
   },
   notNowButtonText: {
     fontSize: 16,
-    color: "#333",
+    color: "#718096",
     fontWeight: "600",
   },
 });
