@@ -23,7 +23,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1a237e"
       },
       "package": "com.gewersdeon.veldt"
@@ -44,7 +44,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "4de16de2-0d33-4ca2-842a-a7b325baa3fd"
+        "projectId": "d323d87d-0def-4cc1-a08f-e2801636f0d1"
       }
     },
     "plugins": [

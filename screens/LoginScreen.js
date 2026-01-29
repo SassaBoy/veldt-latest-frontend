@@ -8,11 +8,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
+  ScrollView,
+  Dimensions,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import axios from "axios";
 import Toast from "react-native-toast-message";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const { width } = Dimensions.get("window");
 
 const LoginScreen = ({ route, navigation }) => {
   const role = route?.params?.role || "User";
@@ -28,9 +32,8 @@ const LoginScreen = ({ route, navigation }) => {
   const redirectParams = route?.params?.params || {};
   
   const handleLogin = async () => {
-    setLoading(true); // Show loading state
-    setError({}); // Clear any previous errors
-  
+    setLoading(true);
+    setError({});
   
     if (!email) {
       setError((prev) => ({ ...prev, email: "Email is required." }));
@@ -42,40 +45,43 @@ const LoginScreen = ({ route, navigation }) => {
       setLoading(false);
       return;
     }
-    
-
   
     try {
-      // Make the API request to login
-      const response = await axios.post("https://service-booking-backend-eb9i.onrender.com/api/auth/login", {
-        email,
-        password,
-      });
+      const response = await axios.post(
+        "https://service-booking-backend-eb9i.onrender.com/api/auth/login",
+        {
+          email,
+          password,
+        }
+      );
   
       const { token, user } = response.data;
-      setIsLoggedIn(true);  // Add this
-      setUserDetails(user); // Add this
-      // Store token in AsyncStorage
+      setIsLoggedIn(true);
+      setUserDetails(user);
+      
       await AsyncStorage.setItem("authToken", token);
       await AsyncStorage.setItem("userId", user.id);
   
-      // Navigate to the appropriate page
-      if (redirectTo && redirectTo !== "Home") {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: redirectTo, params: redirectParams }]
-        });
-      } else {
-        navigation.navigate("Home", { refresh: Date.now() });
-      }
-      
+      Toast.show({
+        type: "success",
+        text1: "Login successful!",
+        text2: `Welcome back, ${user.name || 'User'}!`,
+      });
+
+      setTimeout(() => {
+        if (redirectTo && redirectTo !== "Home") {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: redirectTo, params: redirectParams }]
+          });
+        } else {
+          navigation.navigate("Home", { refresh: Date.now() });
+        }
+      }, 1000);
 
     } catch (error) {
-      // Log technical details in the terminal
       console.debug("Login error (for debugging only):", error.response?.data?.message || error.message || error);
 
-  
-      // Determine user-friendly error message
       let errorMessage = "Something went wrong. Please try again.";
       if (error.response) {
         if (error.response.status === 400) {
@@ -89,8 +95,6 @@ const LoginScreen = ({ route, navigation }) => {
         errorMessage = "Network error. Please check your internet connection.";
       }
 
-  
-      // Set specific error messages for inputs if needed
       if (errorMessage.toLowerCase().includes("email")) {
         setError((prev) => ({ ...prev, email: errorMessage }));
       } else if (errorMessage.toLowerCase().includes("password")) {
@@ -98,256 +102,505 @@ const LoginScreen = ({ route, navigation }) => {
       } else {
         setError((prev) => ({ ...prev, general: errorMessage }));
       }
+
+      Toast.show({
+        type: "error",
+        text1: "Login failed",
+        text2: errorMessage,
+      });
     } finally {
-      setLoading(false); // Reset loading state
+      setLoading(false);
     }
   };
   
-
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
       <Toast />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.content}
+        style={styles.keyboardView}
       >
-        <View style={styles.header}>
-          <Icon name="login" size={40} color="#1a237e" />
-          <Text style={styles.title}>Welcome Back!</Text>
-          <Text style={styles.subtitle}>Login as {role}</Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.container}>
+            {/* Header Section */}
+            <View style={styles.header}>
+              <View style={styles.iconContainer}>
+                <View style={styles.iconInnerCircle}>
+                  <Icon name="login" size={44} color="#1a237e" />
+                </View>
+              </View>
+              <Text style={styles.title}>Welcome Back!</Text>
+              <Text style={styles.subtitle}>
+                Sign in to continue to your account
+              </Text>
+              
+              {/* Role Badge */}
+              <View style={styles.roleBadge}>
+                <Icon name="account-circle" size={16} color="#1a237e" />
+                <Text style={styles.roleText}>Logging in as {role}</Text>
+              </View>
+            </View>
 
-        <View style={styles.form}>
-          {/* Email Input */}
-          <View style={[styles.inputContainer, focusedInput === "email" && styles.inputFocused]}>
-            <Icon
-              name="email"
-              size={20}
-              color={focusedInput === "email" ? "#1a237e" : "#7F8C8D"}
-              style={styles.icon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor="#95A5A6"
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                setError((prev) => ({ ...prev, email: "" }));
-              }}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              onFocus={() => setFocusedInput("email")}
-              onBlur={() => setFocusedInput(null)}
-            />
+            {/* Form Section */}
+            <View style={styles.form}>
+              {/* Email Input */}
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputLabel}>Email Address</Text>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    focusedInput === "email" && styles.inputFocused,
+                    error.email && styles.inputError,
+                  ]}
+                >
+                  <View style={styles.inputIconWrapper}>
+                    <Icon
+                      name="email"
+                      size={20}
+                      color={focusedInput === "email" ? "#1a237e" : "#999"}
+                    />
+                  </View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your email"
+                    placeholderTextColor="#999"
+                    value={email}
+                    onChangeText={(text) => {
+                      setEmail(text);
+                      setError((prev) => ({ ...prev, email: "" }));
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    onFocus={() => setFocusedInput("email")}
+                    onBlur={() => setFocusedInput(null)}
+                  />
+                </View>
+                {error.email && (
+                  <View style={styles.errorContainer}>
+                    <Icon name="error" size={14} color="#d32f2f" />
+                    <Text style={styles.errorText}>{error.email}</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Password Input */}
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputLabel}>Password</Text>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    focusedInput === "password" && styles.inputFocused,
+                    error.password && styles.inputError,
+                  ]}
+                >
+                  <View style={styles.inputIconWrapper}>
+                    <Icon
+                      name="lock"
+                      size={20}
+                      color={focusedInput === "password" ? "#1a237e" : "#999"}
+                    />
+                  </View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your password"
+                    placeholderTextColor="#999"
+                    value={password}
+                    onChangeText={(text) => {
+                      setPassword(text);
+                      setError((prev) => ({ ...prev, password: "" }));
+                    }}
+                    secureTextEntry={!isPasswordVisible}
+                    autoCapitalize="none"
+                    onFocus={() => setFocusedInput("password")}
+                    onBlur={() => setFocusedInput(null)}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+                    style={styles.eyeIcon}
+                    activeOpacity={0.7}
+                  >
+                    <Icon
+                      name={isPasswordVisible ? "visibility" : "visibility-off"}
+                      size={20}
+                      color={focusedInput === "password" ? "#1a237e" : "#999"}
+                    />
+                  </TouchableOpacity>
+                </View>
+                {error.password && (
+                  <View style={styles.errorContainer}>
+                    <Icon name="error" size={14} color="#d32f2f" />
+                    <Text style={styles.errorText}>{error.password}</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Forgot Password Link */}
+              <TouchableOpacity
+                style={styles.forgotPassword}
+                onPress={() => navigation.navigate("RequestPassword")}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+              </TouchableOpacity>
+
+              {/* General Error */}
+              {error.general && (
+                <View style={styles.generalErrorContainer}>
+                  <Icon name="error-outline" size={18} color="#d32f2f" />
+                  <Text style={styles.generalErrorText}>{error.general}</Text>
+                </View>
+              )}
+
+              {/* Login Button */}
+              <TouchableOpacity
+                style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+                onPress={handleLogin}
+                disabled={loading}
+                activeOpacity={0.8}
+              >
+                <View style={styles.buttonContent}>
+                  {loading ? (
+                    <>
+                      <Icon name="autorenew" size={20} color="#fff" />
+                      <Text style={styles.buttonText}>Logging in...</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.buttonText}>Login</Text>
+                      <Icon name="arrow-forward" size={20} color="#fff" />
+                    </>
+                  )}
+                </View>
+              </TouchableOpacity>
+
+              {/* Divider */}
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>OR</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              {/* Signup Link */}
+              <TouchableOpacity
+                style={styles.signupContainer}
+                onPress={() => navigation.navigate("Signup", { role })}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.signupText}>
+                  Don't have an account?{" "}
+                  <Text style={styles.signupHighlight}>Sign up</Text>
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Security Footer */}
+            <View style={styles.securityFooter}>
+              <View style={styles.securityIconWrapper}>
+                <Icon name="security" size={18} color="#2e7d32" />
+              </View>
+              <View style={styles.securityTextContainer}>
+                <Text style={styles.securityTitle}>Secure Login</Text>
+                <Text style={styles.securityText}>
+                  Your credentials are encrypted and protected
+                </Text>
+              </View>
+            </View>
           </View>
-          {error.email && <Text style={styles.errorText}>{error.email}</Text>}
-
-          {/* Password Input */}
-          <View style={[styles.inputContainer, focusedInput === "password" && styles.inputFocused]}>
-            <Icon
-              name="lock"
-              size={20}
-              color={focusedInput === "password" ? "#1a237e" : "#7F8C8D"}
-              style={styles.icon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="#95A5A6"
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                setError((prev) => ({ ...prev, password: "" }));
-              }}
-              secureTextEntry={!isPasswordVisible}
-              autoCapitalize="none"
-              onFocus={() => setFocusedInput("password")}
-              onBlur={() => setFocusedInput(null)}
-            />
-            <TouchableOpacity
-              onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-              style={styles.eyeIcon}
-            >
-              <Icon
-                name={isPasswordVisible ? "visibility" : "visibility-off"}
-                size={20}
-                color={focusedInput === "password" ? "#1a237e" : "#7F8C8D"}
-              />
-            </TouchableOpacity>
-          </View>
-          {error.password && <Text style={styles.errorText}>{error.password}</Text>}
-
-          {error.general && <Text style={styles.errorText}>{error.general}</Text>}
-
-          {/* Login Button */}
-          <TouchableOpacity
-  style={[styles.button, loading && { backgroundColor: "#9ea1c7", flexDirection: "row", justifyContent: "center", alignItems: "center" }]}
-  onPress={handleLogin}
-  disabled={loading}
->
-  {loading ? (
-    <>
-      <Icon name="autorenew" size={20} color="#fff" style={{ marginRight: 10 }} />
-      <Text style={styles.buttonText}>Logging in...</Text>
-    </>
-  ) : (
-    <Text style={styles.buttonText}>Login</Text>
-  )}
-</TouchableOpacity>
-
-
-          {/* Forgot Password */}
-          <TouchableOpacity
-            style={styles.forgotPassword}
-            onPress={() => navigation.navigate("RequestPassword")}
-          >
-            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-          </TouchableOpacity>
-
-          {/* Divider */}
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* Signup Link */}
-          <TouchableOpacity
-            style={styles.signupLink}
-            onPress={() => navigation.navigate("Signup", { role })}
-          >
-            <Text style={styles.signupText}>
-              Don't have an account? <Text style={styles.signupHighlight}>Sign up</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#f8f9fc",
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
-  },
-  content: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
   header: {
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: 32,
+    marginTop: 20,
+  },
+  iconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#1a237e",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  iconInnerCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(26, 35, 126, 0.08)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#2C3E50",
-    marginTop: 20,
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#1a237e",
     marginBottom: 8,
+    textAlign: "center",
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 16,
-    color: "#7F8C8D",
-    marginBottom: 20,
+    fontSize: 15,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  roleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(26, 35, 126, 0.08)",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  roleText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#1a237e",
   },
   form: {
     width: "100%",
     maxWidth: 400,
     alignSelf: "center",
   },
+  inputWrapper: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1a237e",
+    marginBottom: 8,
+    letterSpacing: -0.2,
+  },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    marginBottom: 16,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: "#e0e0e0",
     paddingHorizontal: 16,
     height: 56,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   inputFocused: {
-    borderWidth: 0,
-    shadowColor: "#1a237e",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    borderColor: "#1a237e",
+    borderWidth: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#1a237e",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
-  icon: {
+  inputError: {
+    borderColor: "#d32f2f",
+    borderWidth: 1.5,
+  },
+  inputIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(26, 35, 126, 0.05)",
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
   },
   input: {
     flex: 1,
     fontSize: 16,
     color: "#2C3E50",
+    paddingVertical: 0,
   },
   eyeIcon: {
     padding: 8,
   },
+  errorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+    gap: 6,
+  },
+  errorText: {
+    fontSize: 13,
+    color: "#d32f2f",
+    flex: 1,
+  },
   forgotPassword: {
     alignSelf: "flex-end",
-    marginBottom: 24,
+    marginBottom: 20,
   },
   forgotPasswordText: {
     color: "#1a237e",
     fontSize: 14,
     fontWeight: "600",
   },
-  button: {
-    backgroundColor: "#1a237e",
-    padding: 16,
-    borderRadius: 12,
-    width: "100%",
+  generalErrorContainer: {
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
-    marginBottom: 15,
+    backgroundColor: "#ffebee",
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 10,
+  },
+  generalErrorText: {
+    flex: 1,
+    fontSize: 14,
+    color: "#d32f2f",
+    lineHeight: 20,
+  },
+  loginButton: {
+    backgroundColor: "#1a237e",
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+    marginBottom: 24,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#1a237e",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+  },
+  loginButtonDisabled: {
+    backgroundColor: "#bdbdbd",
+    ...Platform.select({
+      ios: {
+        shadowOpacity: 0,
+      },
+      android: {
+        elevation: 0,
+      },
+    }),
+  },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
   },
   buttonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
   },
   divider: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 30,
+    marginVertical: 24,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: "#E0E0E0",
+    backgroundColor: "#e0e0e0",
   },
   dividerText: {
-    color: "#7F8C8D",
+    color: "#999",
     paddingHorizontal: 16,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600",
   },
-  signupLink: {
+  signupContainer: {
     alignItems: "center",
+    padding: 16,
   },
   signupText: {
     fontSize: 15,
-    color: "#7F8C8D",
+    color: "#666",
   },
   signupHighlight: {
     color: "#1a237e",
-    fontWeight: "600",
+    fontWeight: "700",
   },
-  errorText: {
-    color: "red",
+  securityFooter: {
+    flexDirection: "row",
+    backgroundColor: "#e8f5e9",
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 20,
+    gap: 12,
+  },
+  securityIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  securityTextContainer: {
+    flex: 1,
+  },
+  securityTitle: {
     fontSize: 14,
-    marginTop: -10,
-    marginBottom: 10,
+    fontWeight: "700",
+    color: "#2e7d32",
+    marginBottom: 4,
+  },
+  securityText: {
+    fontSize: 12,
+    color: "#558b2f",
+    lineHeight: 18,
   },
 });
 

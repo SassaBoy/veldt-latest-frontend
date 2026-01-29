@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -20,117 +21,98 @@ const ReviewsPage = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchReviews = async () => {
-      try {
-        const token = await AsyncStorage.getItem("authToken");
-        console.log("Token fetched:", token);
-  
-        if (!token) {
-          Alert.alert("Error", "Authentication failed. Please log in again.");
-          navigation.navigate("Login");
-          return;
-        }
-  
-        const response = await axios.get(
-          "https://service-booking-backend-eb9i.onrender.com/api/reviews/my-reviews",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-  
-        console.log("Reviews Response:", response.data);
-  
-        if (response.data.success) {
-          setReviewsData(response.data.data.reviews || []);
-          setAverageRating(response.data.data.averageRating || 0);
-        } else {
-          Alert.alert("Error", response.data.message || "Failed to fetch reviews.");
-        }
-      } catch (error) {
-        console.error("Error fetching reviews:", error);
-        Alert.alert("Error", "An error occurred while fetching data.");
-      } finally {
-        setLoading(false);
-      }
-    };
-  
     fetchReviews();
   }, []);
-  
-  const renderStars = (rating) => {
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-    const stars = [];
 
-    for (let i = 0; i < 5; i++) {
-      if (i < fullStars) {
-        stars.push(
-          <Icon key={`star-${i}`} name="star" size={14} color="#FFD700" style={styles.starIcon} />
-        );
-      } else if (i === fullStars && hasHalfStar) {
-        stars.push(
-          <Icon key={`star-${i}`} name="star-half" size={14} color="#FFD700" style={styles.starIcon} />
-        );
-      } else {
-        stars.push(
-          <Icon key={`star-${i}`} name="star-outline" size={14} color="#FFD700" style={styles.starIcon} />
-        );
+  const fetchReviews = async () => {
+    try {
+      const token = await AsyncStorage.getItem("authToken");
+      if (!token) {
+        Alert.alert("Error", "Session expired. Please log in again.");
+        navigation.navigate("Login");
+        return;
       }
+
+      const response = await axios.get(
+        "https://service-booking-backend-eb9i.onrender.com/api/reviews/my-reviews",
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        setReviewsData(response.data.data.reviews || []);
+        setAverageRating(response.data.data.averageRating || 0);
+      }
+    } catch (error) {
+      console.error("Error fetching reviews:", error);
+      Alert.alert("Error", "Could not load reviews. Please try again later.");
+    } finally {
+      setLoading(false);
     }
-    return stars;
+  };
+
+  const renderStars = (rating) => {
+    return [...Array(5)].map((_, i) => {
+      let iconName = "star-outline";
+      if (i < Math.floor(rating)) iconName = "star";
+      else if (i === Math.floor(rating) && rating % 1 !== 0) iconName = "star-half";
+      return <Icon key={i} name={iconName} size={16} color="#FFD700" />;
+    });
   };
 
   const renderReviewItem = ({ item }) => (
     <View style={styles.reviewCard}>
       <View style={styles.reviewHeader}>
-        <View style={styles.reviewerInfo}>
         <Image
-  source={{
-    uri: item.userId && item.userId.profileImage
-      ? `https://service-booking-backend-eb9i.onrender.com/${item.userId.profileImage.replace(/\\/g, "/")}`
-      : "https://service-booking-backend-eb9i.onrender.com/uploads/default-profile.png",
-  }}
-  style={styles.avatar}
-/>
-
-
-
-          <View style={styles.reviewerDetails}>
-          <Text style={styles.reviewerName}>{item.userId?.name || "Anonymous"}</Text>
-            <View style={styles.ratingContainer}>
-              <View style={styles.starsContainer}>{renderStars(item.rating)}</View>
-              <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
-            </View>
+          source={{
+            uri: item.userId?.profileImage
+              ? `https://service-booking-backend-eb9i.onrender.com/${item.userId.profileImage.replace(/\\/g, "/")}`
+              : "https://service-booking-backend-eb9i.onrender.com/uploads/default-profile.png",
+          }}
+          style={styles.avatar}
+        />
+        <View style={styles.reviewerDetails}>
+          <Text style={styles.reviewerName}>{item.userId?.name || "Verified Customer"}</Text>
+          <View style={styles.starsRow}>
+            {renderStars(item.rating)}
+            <Text style={styles.dateText}>{new Date(item.createdAt).toLocaleDateString()}</Text>
           </View>
         </View>
       </View>
-
-      <Text style={styles.feedbackText}>{item.review}</Text>
-
-      <View style={styles.reviewFooter}>
-        <Text style={styles.dateText}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+      
+      <View style={styles.feedbackContainer}>
+        <Text style={styles.feedbackText}>{item.review}</Text>
       </View>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-back" size={24} color="#fff" />
+          <Icon name="arrow-back" size={24} color="#1a237e" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Reviews</Text>
-        <View style={styles.averageRating}>
-          <Text style={styles.averageRatingText}>
-            Avg. Rating: {averageRating} ★
-          </Text>
-        </View>
+        <Text style={styles.headerTitle}>Customer Reviews</Text>
+        <TouchableOpacity onPress={fetchReviews} style={styles.refreshButton}>
+          <Icon name="refresh" size={22} color="#1a237e" />
+        </TouchableOpacity>
       </View>
 
+      {/* Summary Score */}
+      {!loading && reviewsData.length > 0 && (
+        <View style={styles.summaryCard}>
+          <View style={styles.scoreContainer}>
+            <Text style={styles.bigScore}>{averageRating}</Text>
+            <View style={styles.bigStars}>{renderStars(averageRating)}</View>
+            <Text style={styles.totalReviews}>{reviewsData.length} total reviews</Text>
+          </View>
+        </View>
+      )}
+
       {loading ? (
-        <ActivityIndicator size="large" color="#1a237e" style={styles.loadingIndicator} />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#1a237e" />
+          <Text style={styles.loadingText}>Loading feedback...</Text>
+        </View>
       ) : (
         <FlatList
           data={reviewsData}
@@ -138,7 +120,12 @@ const ReviewsPage = ({ navigation }) => {
           renderItem={renderReviewItem}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
-          ListEmptyComponent={<Text style={styles.emptyText}>No reviews available.</Text>}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Icon name="rate-review" size={64} color="#ccc" />
+              <Text style={styles.emptyText}>No reviews found yet.</Text>
+            </View>
+          }
         />
       )}
     </SafeAreaView>
@@ -146,123 +133,52 @@ const ReviewsPage = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f4f6fa", // Slightly softer background
-  },
+  safeArea: { flex: 1, backgroundColor: "#f8f9fc" },
   header: {
-    backgroundColor: "#1a237e",
-    paddingTop: 60,
-    paddingBottom: 20,
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    elevation: 4,
+    paddingVertical: 15,
+    backgroundColor: "#fff",
   },
-  backButton: {
-    marginRight: 16,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#ffffff",
-  },
-  averageRating: {
-    backgroundColor: "#ffffff20",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+  backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#f0f2f5", alignItems: "center", justifyContent: "center" },
+  headerTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "800", color: "#1a237e" },
+  refreshButton: { width: 40, alignItems: "flex-end" },
+  summaryCard: {
+    backgroundColor: "#fff",
+    margin: 20,
     borderRadius: 20,
+    padding: 20,
+    alignItems: "center",
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10 },
+      android: { elevation: 4 },
+    }),
   },
-  averageRatingText: {
-    fontSize: 14,
-    color: "#ffffff",
-  },
-  listContainer: {
-    padding: 16,
-    paddingTop: 8,
-  },
+  bigScore: { fontSize: 48, fontWeight: "900", color: "#1a237e" },
+  bigStars: { flexDirection: "row", marginVertical: 8 },
+  totalReviews: { fontSize: 12, color: "#888", fontWeight: "600", textTransform: "uppercase" },
+  listContainer: { padding: 20, paddingTop: 0 },
   reviewCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16, // Slightly larger border radius
-    marginBottom: 16, // More space between cards
+    backgroundColor: "#fff",
+    borderRadius: 16,
     padding: 16,
-    shadowColor: "#000", // Added shadow for depth
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3, // for Android
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#f0f0f0",
   },
-  reviewerInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12, // Added margin for better spacing
-  },
-  avatar: {
-    width: 56, // Slightly larger avatar
-    height: 56,
-    borderRadius: 28,
-    marginRight: 16,
-    borderWidth: 2, // Added border
-    borderColor: "#e0e0e0",
-  },
-  reviewerName: {
-    fontSize: 18, // Increased font size
-    fontWeight: "700", // Bolder font weight
-    color: "#1a237e",
-    marginBottom: 6,
-  },
-  ratingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f0f4ff", // Light background for rating
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  starsContainer: {
-    flexDirection: "row",
-    marginRight: 8,
-  },
-  starIcon: {
-    marginRight: 2,
-  },
-  ratingText: {
-    fontSize: 14,
-    color: "#1a237e",
-    fontWeight: "600",
-  },
-  feedbackText: {
-    fontSize: 15,
-    color: "#333", // Darker text for better readability
-    lineHeight: 22,
-    marginBottom: 12,
-    backgroundColor: "#f9f9fc", // Very light background
-    padding: 12,
-    borderRadius: 8,
-  },
-  reviewFooter: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-  },
-  dateText: {
-    fontSize: 12,
-    color: "#666",
-    fontStyle: "italic",
-  },
-  loadingIndicator: {
-    marginTop: 20,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    marginTop: 20,
-    fontStyle: "italic",
-  },
+  reviewHeader: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  avatar: { width: 45, height: 45, borderRadius: 22.5, marginRight: 12, backgroundColor: "#eee" },
+  reviewerDetails: { flex: 1 },
+  reviewerName: { fontSize: 15, fontWeight: "700", color: "#333", marginBottom: 2 },
+  starsRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  dateText: { fontSize: 11, color: "#aaa", fontWeight: "500" },
+  feedbackContainer: { backgroundColor: "#f9f9fb", padding: 12, borderRadius: 12 },
+  feedbackText: { fontSize: 14, color: "#555", lineHeight: 20 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingText: { marginTop: 10, color: "#1a237e", fontWeight: "500" },
+  emptyContainer: { alignItems: "center", marginTop: 100 },
+  emptyText: { marginTop: 10, color: "#aaa", fontSize: 16 },
 });
+
 export default ReviewsPage;

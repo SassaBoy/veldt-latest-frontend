@@ -6,296 +6,269 @@ import {
   StyleSheet,
   ScrollView,
   SafeAreaView,
-  Clipboard,
+  Platform,
+  Alert,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const BankTransferScreen = ({ navigation }) => {
-  const handleCopy = (text) => {
-    Clipboard.setString(text);
+  
+  const copyToClipboard = async (text, label) => {
+    await Clipboard.setStringAsync(text);
+    // You could replace this with a Toast message for a better UX
+    Alert.alert('Copied', `${label} has been copied to your clipboard.`);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => navigation.goBack()}
-        >
-          <MaterialIcons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Bank Transfer</Text>
-        <View style={styles.rightHeader}>
-          <MaterialIcons name="account-balance" size={24} color="#fff" />
-        </View>
-      </View>
-
-      <ScrollView style={styles.content}>
-        <View style={styles.amountCard}>
-          <Text style={styles.amountLabel}>Amount to Transfer</Text>
-          <Text style={styles.amountValue}>NAD 180.00</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
           <TouchableOpacity 
-            style={styles.copyButton}
-            onPress={() => handleCopy('180.00')}
+            style={styles.backButtonInner} 
+            onPress={() => navigation.goBack()}
           >
-            <MaterialIcons name="content-copy" size={20} color="#1a237e" />
-            <Text style={styles.copyText}>Copy Amount</Text>
+            <Icon name="arrow-back" size={24} color="#1a237e" />
           </TouchableOpacity>
-        </View>
-
-        <View style={styles.referenceSection}>
-          <View style={styles.referenceCard}>
-            <MaterialIcons name="info" size={24} color="#1a237e" />
-            <Text style={styles.referenceText}>
-              Please use your phone number as the payment reference
-            </Text>
+          <Text style={styles.headerTitle}>Bank Transfer</Text>
+          <View style={styles.headerIconInner}>
+            <Icon name="account-balance" size={24} color="#1a237e" />
           </View>
         </View>
 
-        <View style={styles.bankDetailsSection}>
-          <Text style={styles.sectionTitle}>Bank Details</Text>
-          <View style={styles.bankDetailCard}>
-            <BankDetailRow 
-              label="Account Name" 
-              value="Veldt Namibia Services" 
-              onCopy={() => handleCopy('Veldt Namibia Services')}
-            />
-            <BankDetailRow 
-              label="Bank" 
-              value="First National Bank" 
-              onCopy={() => handleCopy('First National Bank')}
-            />
-            <BankDetailRow 
-              label="Branch" 
-              value="Windhoek" 
-              onCopy={() => handleCopy('Windhoek')}
-            />
-            <BankDetailRow 
-              label="Branch Code" 
-              value="280172" 
-              onCopy={() => handleCopy('280172')}
-            />
-            <BankDetailRow 
-              label="SWIFT Code" 
-              value="FIRNNANXXX" 
-              onCopy={() => handleCopy('FIRNNANXXX')}
-            />
-            <BankDetailRow 
-              label="Account Number" 
-              value="62272889076" 
-              onCopy={() => handleCopy('62272889076')}
-              isLast
-            />
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Top Amount Card */}
+          <View style={styles.amountCard}>
+            <Text style={styles.amountLabel}>Total Amount to Pay</Text>
+            <Text style={styles.amountValue}>N$ 180.00</Text>
+            <TouchableOpacity 
+              style={styles.copyBadge}
+              onPress={() => copyToClipboard('180.00', 'Amount')}
+            >
+              <Icon name="content-copy" size={16} color="#1a237e" />
+              <Text style={styles.copyBadgeText}>COPY AMOUNT</Text>
+            </TouchableOpacity>
           </View>
-        </View>
 
-        <View style={styles.notesSection}>
-          <Text style={styles.sectionTitle}>Important Notes</Text>
-          <View style={styles.noteCard}>
-            <NoteItem 
-              icon="phone" 
-              text="Use your phone number as the payment reference to ensure proper tracking" 
-            />
-            <NoteItem 
-              icon="receipt" 
-              text="Keep your payment confirmation for future reference" 
-            />
-            <NoteItem 
-              icon="schedule" 
-              text="Payments are typically verified within 24 hours" 
-            />
-            <NoteItem 
-              icon="support-agent" 
-              text="Contact our support at +264 857 886 108 if you need assistance" 
-              isLast
-            />
+          {/* Reference Banner */}
+          <View style={styles.referenceBanner}>
+            <View style={styles.bannerIconWrapper}>
+              <Icon name="priority-high" size={20} color="#e65100" />
+            </View>
+            <View style={styles.bannerTextContent}>
+              <Text style={styles.bannerTitle}>Required Reference</Text>
+              <Text style={styles.bannerSubtitle}>
+                Use your registered phone number as the reference for instant tracking.
+              </Text>
+            </View>
           </View>
-        </View>
-      </ScrollView>
+
+          {/* Bank Details */}
+          <View style={styles.section}>
+            <Text style={styles.sectionHeader}>Official Bank Account</Text>
+            <View style={styles.detailCard}>
+              <DetailRow 
+                label="Account Name" 
+                value="Veldt Namibia Services" 
+                onPress={() => copyToClipboard('Veldt Namibia Services', 'Account Name')}
+              />
+              <DetailRow 
+                label="Bank Name" 
+                value="First National Bank (FNB)" 
+                onPress={() => copyToClipboard('First National Bank', 'Bank Name')}
+              />
+              <DetailRow 
+                label="Account Number" 
+                value="62272889076" 
+                onPress={() => copyToClipboard('62272889076', 'Account Number')}
+              />
+              <DetailRow 
+                label="Branch Code" 
+                value="280172" 
+                onPress={() => copyToClipboard('280172', 'Branch Code')}
+              />
+              <DetailRow 
+                label="Account Type" 
+                value="Business Cheque" 
+                hideCopy
+              />
+            </View>
+          </View>
+
+          {/* Instructions */}
+          <View style={styles.section}>
+            <Text style={styles.sectionHeader}>Next Steps</Text>
+            <View style={styles.instructionCard}>
+              <StepItem 
+                icon="app-registration" 
+                text="Open your banking app and make the transfer using the details above." 
+              />
+              <StepItem 
+                icon="file-download" 
+                text="Download or take a screenshot of your Proof of Payment." 
+              />
+              <StepItem 
+                icon="verified" 
+                text="Your service will be activated once the payment is reflected (typically 1-2 hours for FNB users)." 
+                isLast
+              />
+            </View>
+          </View>
+
+          {/* Support CTA */}
+          <TouchableOpacity style={styles.supportButton}>
+            <Icon name="headset-mic" size={20} color="#666" />
+            <Text style={styles.supportButtonText}>Having trouble? Contact Support</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };
 
-const BankDetailRow = ({ label, value, onCopy, isLast }) => (
-  <View style={[styles.bankDetailRow, !isLast && styles.bankDetailRowBorder]}>
-    <Text style={styles.bankDetailLabel}>{label}</Text>
-    <View style={styles.valueContainer}>
-      <Text style={styles.bankDetailValue}>{value}</Text>
-      <TouchableOpacity onPress={onCopy}>
-        <MaterialIcons name="content-copy" size={20} color="#1a237e" />
-      </TouchableOpacity>
+// Reusable Components
+const DetailRow = ({ label, value, onPress, hideCopy }) => (
+  <View style={styles.detailRow}>
+    <View style={styles.detailTextWrapper}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.detailValue}>{value}</Text>
     </View>
+    {!hideCopy && (
+      <TouchableOpacity style={styles.rowCopyButton} onPress={onPress}>
+        <Icon name="content-copy" size={18} color="#1a237e" />
+      </TouchableOpacity>
+    )}
   </View>
 );
 
-const NoteItem = ({ icon, text, isLast }) => (
-  <View style={[styles.noteItem, !isLast && styles.noteItemBorder]}>
-    <MaterialIcons name={icon} size={20} color="#1a237e" style={styles.noteIcon} />
-    <Text style={styles.noteText}>{text}</Text>
+const StepItem = ({ icon, text, isLast }) => (
+  <View style={[styles.stepItem, !isLast && styles.stepBorder]}>
+    <View style={styles.stepIconWrapper}>
+      <Icon name={icon} size={20} color="#1a237e" />
+    </View>
+    <Text style={styles.stepText}>{text}</Text>
   </View>
 );
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9ff',
-  },
+  safeArea: { flex: 1, backgroundColor: '#f8f9fc' },
+  container: { flex: 1 },
   header: {
-    backgroundColor: '#1a237e',
-    paddingTop: 60,
-    paddingBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 20,
-    flexDirection: 'row',
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5 },
+      android: { elevation: 3 },
+    }),
+  },
+  backButtonInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(26, 35, 126, 0.05)',
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    justifyContent: 'center',
   },
-  backButton: {
-    marginRight: 16,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#ffffff',
-    letterSpacing: 0.5,
-  },
-  rightHeader: {
-    marginLeft: 16,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: '#1a237e' },
+  headerIconInner: { width: 40, alignItems: 'flex-end' },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: 20 },
   amountCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
     alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
-  },
-  amountLabel: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 8,
-  },
-  amountValue: {
-    fontSize: 32,
-    color: '#1a237e',
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  copyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-  },
-  copyText: {
-    color: '#1a237e',
-    marginLeft: 4,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  referenceSection: {
-    marginBottom: 24,
-  },
-  referenceCard: {
-    backgroundColor: '#E8F0FE',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#B3D4F7',
+    borderColor: '#e0e0e0',
   },
-  referenceText: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
-    color: '#1a237e',
-    lineHeight: 22,
-  },
-  bankDetailsSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a237e',
-    marginBottom: 16,
-  },
-  bankDetailCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
-  },
-  bankDetailRow: {
+  amountLabel: { fontSize: 14, color: '#666', fontWeight: '600', marginBottom: 8 },
+  amountValue: { fontSize: 36, fontWeight: '900', color: '#1a237e', marginBottom: 16 },
+  copyBadge: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
+    backgroundColor: 'rgba(26, 35, 126, 0.08)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignItems: 'center',
+    gap: 6,
   },
-  bankDetailRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+  copyBadgeText: { fontSize: 12, fontWeight: '800', color: '#1a237e' },
+  referenceBanner: {
+    flexDirection: 'row',
+    backgroundColor: '#fff3e0',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 24,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff9800',
+    alignItems: 'center',
+    gap: 12,
   },
-  valueContainer: {
+  bannerIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bannerTextContent: { flex: 1 },
+  bannerTitle: { fontSize: 14, fontWeight: '800', color: '#e65100', marginBottom: 2 },
+  bannerSubtitle: { fontSize: 12, color: '#ef6c00', lineHeight: 18 },
+  section: { marginBottom: 24 },
+  sectionHeader: { fontSize: 16, fontWeight: '800', color: '#1a237e', marginBottom: 12, marginLeft: 4 },
+  detailCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  bankDetailLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  bankDetailValue: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '500',
-    marginRight: 12,
-  },
-  notesSection: {
-    marginBottom: 24,
-  },
-  noteCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
     padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f8f8f8',
   },
-  noteItem: {
+  detailTextWrapper: { flex: 1 },
+  detailLabel: { fontSize: 11, fontWeight: '700', color: '#999', textTransform: 'uppercase', marginBottom: 4 },
+  detailValue: { fontSize: 15, fontWeight: '600', color: '#333' },
+  rowCopyButton: {
+    padding: 8,
+    backgroundColor: 'rgba(26, 35, 126, 0.05)',
+    borderRadius: 8,
+  },
+  instructionCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16 },
+  stepItem: { flexDirection: 'row', paddingVertical: 12, gap: 16 },
+  stepBorder: { borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  stepIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(26, 35, 126, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepText: { flex: 1, fontSize: 14, color: '#555', lineHeight: 20 },
+  supportButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    marginBottom: 20,
   },
-  noteItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  noteIcon: {
-    marginRight: 12,
-  },
-  noteText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-  },
+  supportButtonText: { fontSize: 14, color: '#666', fontWeight: '500' },
 });
 
 export default BankTransferScreen;

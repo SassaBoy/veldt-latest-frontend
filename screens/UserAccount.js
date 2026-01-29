@@ -18,7 +18,7 @@ import { Picker } from "@react-native-picker/picker";
 import Toast from "react-native-toast-message";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import { MaterialIcons } from "@expo/vector-icons";
+import Icon from "react-native-vector-icons/MaterialIcons";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import PasswordFields from './PasswordFields';
 import ServicesSection101 from "./ServicesSection101";
@@ -144,7 +144,6 @@ const UserAccount = ({ route, navigation }) => {
       const token = await AsyncStorage.getItem("authToken");
       if (!token) throw new Error("Authentication token is missing.");
 
-      // Safety check: wait for userDetails to be loaded
       if (!userDetails || !userDetails.id) {
         throw new Error("User details not loaded yet. Please try again.");
       }
@@ -155,12 +154,6 @@ const UserAccount = ({ route, navigation }) => {
       const formData = new FormData();
       formData.append("profileImage", {
         uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
-        name: `profile_${Date.now()}.${fileType}`,
-        type: `image/${fileType === 'jpg' ? 'jpeg' : fileType}`,
-      });
-
-      console.log("Uploading file:", {
-        uri,
         name: `profile_${Date.now()}.${fileType}`,
         type: `image/${fileType === 'jpg' ? 'jpeg' : fileType}`,
       });
@@ -178,12 +171,10 @@ const UserAccount = ({ route, navigation }) => {
       );
 
       const rawText = await response.text();
-      console.log("Raw Response Text:", rawText);
 
       if (!response.ok) throw new Error(`Server Error: ${response.status} - ${rawText}`);
 
       const data = JSON.parse(rawText);
-      console.log("Upload successful:", data);
 
       Toast.show({
         type: "success",
@@ -213,11 +204,8 @@ const UserAccount = ({ route, navigation }) => {
         quality: 1,
       });
 
-      console.log("Image Picker Result:", result);
       if (!result.canceled && result.assets && result.assets[0]?.uri) {
         await uploadProfilePicture(result.assets[0].uri);
-      } else {
-        console.error("Image selection canceled or invalid result.");
       }
     } catch (error) {
       console.error("Error picking image from gallery:", error);
@@ -232,11 +220,8 @@ const UserAccount = ({ route, navigation }) => {
         quality: 1,
       });
 
-      console.log("Camera Result:", result);
       if (!result.canceled && result.assets && result.assets[0]?.uri) {
         await uploadProfilePicture(result.assets[0].uri);
-      } else {
-        console.error("Photo capture canceled or invalid result.");
       }
     } catch (error) {
       console.error("Error taking photo:", error);
@@ -587,103 +572,139 @@ const UserAccount = ({ route, navigation }) => {
       transparent
       onRequestClose={() => setBottomSidebarVisible(false)}
     >
-      <View style={styles.bottomSidebarOverlay}>
-        <View style={styles.bottomSidebar}>
+      <TouchableOpacity 
+        style={styles.bottomSidebarOverlay}
+        activeOpacity={1}
+        onPress={() => setBottomSidebarVisible(false)}
+      >
+        <TouchableOpacity 
+          activeOpacity={1} 
+          style={styles.bottomSidebar}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <View style={styles.sidebarHandle} />
           <Text style={styles.bottomSidebarTitle}>Update Profile Picture</Text>
+          
           <TouchableOpacity
             style={styles.optionButton}
             onPress={() => {
               setBottomSidebarVisible(false);
               pickImageFromGallery();
             }}
+            activeOpacity={0.7}
           >
-            <MaterialIcons name="photo-library" size={28} color="#1a237e" />
+            <View style={styles.optionIconWrapper}>
+              <Icon name="photo-library" size={24} color="#1a237e" />
+            </View>
             <Text style={styles.optionText}>Choose from Gallery</Text>
+            <Icon name="arrow-forward-ios" size={16} color="#999" />
           </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.optionButton}
             onPress={() => {
               setBottomSidebarVisible(false);
               takePhoto();
             }}
+            activeOpacity={0.7}
           >
-            <MaterialIcons name="camera-alt" size={28} color="#1a237e" />
+            <View style={styles.optionIconWrapper}>
+              <Icon name="camera-alt" size={24} color="#1a237e" />
+            </View>
             <Text style={styles.optionText}>Take a Photo</Text>
+            <Icon name="arrow-forward-ios" size={16} color="#999" />
           </TouchableOpacity>
+
           <TouchableOpacity
-            style={[styles.optionButton, styles.cancelButton]}
+            style={styles.cancelButton}
             onPress={() => setBottomSidebarVisible(false)}
+            activeOpacity={0.7}
           >
-            <MaterialIcons name="close" size={28} color="#F44336" />
-            <Text style={[styles.optionText, styles.cancelText]}>Cancel</Text>
+            <Text style={styles.cancelText}>Cancel</Text>
           </TouchableOpacity>
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 
   const renderBasicInfo = () => {
     const basicFields = [
-      { key: "name", label: "Name" },
-      { key: "email", label: "Email" },
-      { key: "phone", label: "Phone" },
+      { key: "name", label: "Full Name", icon: "person" },
+      { key: "email", label: "Email Address", icon: "email" },
+      { key: "phone", label: "Phone Number", icon: "phone" },
     ];
 
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Basic Information</Text>
-        {basicFields.map(({ key, label }) => (
+        <View style={styles.sectionHeader}>
+          <Icon name="info" size={20} color="#1a237e" />
+          <Text style={styles.sectionTitle}>Basic Information</Text>
+        </View>
+        
+        {basicFields.map(({ key, label, icon }) => (
           <View key={key} style={styles.field}>
             <Text style={styles.fieldLabel}>{label}</Text>
             {editing ? (
-              <TextInput
-                style={[styles.input, editableFields.errors?.[key] && styles.errorInput]}
-                value={editableFields[key] || ""}
-                onChangeText={(text) =>
-                  setEditableFields((prev) => ({
-                    ...prev,
-                    [key]: text,
-                    errors: { ...prev.errors, [key]: "" },
-                  }))
-                }
-                keyboardType={key === "email" ? "email-address" : key === "phone" ? "phone-pad" : "default"}
-              />
+              <View style={[styles.inputContainer, editableFields.errors?.[key] && styles.errorInputContainer]}>
+                <View style={styles.inputIconWrapper}>
+                  <Icon name={icon} size={20} color={editableFields.errors?.[key] ? "#d32f2f" : "#1a237e"} />
+                </View>
+                <TextInput
+                  style={styles.input}
+                  value={editableFields[key] || ""}
+                  onChangeText={(text) =>
+                    setEditableFields((prev) => ({
+                      ...prev,
+                      [key]: text,
+                      errors: { ...prev.errors, [key]: "" },
+                    }))
+                  }
+                  keyboardType={key === "email" ? "email-address" : key === "phone" ? "phone-pad" : "default"}
+                  placeholder={`Enter ${label.toLowerCase()}`}
+                  placeholderTextColor="#999"
+                />
+              </View>
             ) : (
-              <Text style={styles.fieldValue}>{editableFields[key] || 'Not provided'}</Text>
+              <View style={styles.fieldValueContainer}>
+                <View style={styles.fieldIconWrapper}>
+                  <Icon name={icon} size={18} color="#1a237e" />
+                </View>
+                <Text style={styles.fieldValue}>{editableFields[key] || 'Not provided'}</Text>
+              </View>
             )}
             {editableFields.errors?.[key] && (
-              <Text style={styles.errorText}>{editableFields.errors[key]}</Text>
+              <View style={styles.errorContainer}>
+                <Icon name="error" size={14} color="#d32f2f" />
+                <Text style={styles.errorText}>{editableFields.errors[key]}</Text>
+              </View>
             )}
           </View>
         ))}
+
         {editing && (
           <TouchableOpacity
-            style={styles.passwordButton}
+            style={styles.passwordToggleButton}
             onPress={() => setShowPasswordFields(!showPasswordFields)}
+            activeOpacity={0.7}
           >
-            <MaterialIcons name="lock-outline" size={20} color="#1a237e" />
-            <Text style={styles.passwordButtonText}>
+            <View style={styles.passwordIconWrapper}>
+              <Icon name={showPasswordFields ? "lock" : "lock-outline"} size={20} color="#1a237e" />
+            </View>
+            <Text style={styles.passwordToggleText}>
               {showPasswordFields ? "Hide Password Fields" : "Change Password"}
             </Text>
+            <Icon name={showPasswordFields ? "expand-less" : "expand-more"} size={24} color="#1a237e" />
           </TouchableOpacity>
         )}
+
         {editing && showPasswordFields && (
-          <>
+          <View style={styles.passwordFieldsContainer}>
             <PasswordFields
               passwordFields={passwordFields}
               setPasswordFields={setPasswordFields}
               onValidationChange={() => {}}
             />
-            {editableFields.errors?.oldPassword && (
-              <Text style={styles.errorText}>{editableFields.errors.oldPassword}</Text>
-            )}
-            {editableFields.errors?.newPassword && (
-              <Text style={styles.errorText}>{editableFields.errors.newPassword}</Text>
-            )}
-            {editableFields.errors?.confirmPassword && (
-              <Text style={styles.errorText}>{editableFields.errors.confirmPassword}</Text>
-            )}
-          </>
+          </View>
         )}
       </View>
     );
@@ -694,51 +715,80 @@ const UserAccount = ({ route, navigation }) => {
 
     return (
       <>
+        {/* Business Information Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Business Information</Text>
-          {['businessAddress', 'town', 'yearsOfExperience'].map((key) => (
+          <View style={styles.sectionHeader}>
+            <Icon name="business" size={20} color="#1a237e" />
+            <Text style={styles.sectionTitle}>Business Information</Text>
+          </View>
+          
+          {[
+            { key: 'businessAddress', label: 'Business Address', icon: 'location-on' },
+            { key: 'town', label: 'Town/City', icon: 'location-city' },
+            { key: 'yearsOfExperience', label: 'Years of Experience', icon: 'work' },
+          ].map(({ key, label, icon }) => (
             <View key={key} style={styles.field}>
-              <Text style={styles.fieldLabel}>
-                {key === 'businessAddress' ? 'Business Address' : key === 'town' ? 'Town' : 'Years of Experience'}
-              </Text>
+              <Text style={styles.fieldLabel}>{label}</Text>
               {editing ? (
-                <TextInput
-                  style={[styles.input, editableFields.errors?.[key] && styles.errorInput]}
-                  value={editableFields[key]?.toString() || ""}
-                  onChangeText={(text) =>
-                    setEditableFields((prev) => ({
-                      ...prev,
-                      [key]: text,
-                      errors: { ...prev.errors, [key]: '' },
-                    }))
-                  }
-                />
+                <View style={[styles.inputContainer, editableFields.errors?.[key] && styles.errorInputContainer]}>
+                  <View style={styles.inputIconWrapper}>
+                    <Icon name={icon} size={20} color="#1a237e" />
+                  </View>
+                  <TextInput
+                    style={styles.input}
+                    value={editableFields[key]?.toString() || ""}
+                    onChangeText={(text) =>
+                      setEditableFields((prev) => ({
+                        ...prev,
+                        [key]: text,
+                        errors: { ...prev.errors, [key]: '' },
+                      }))
+                    }
+                    placeholder={`Enter ${label.toLowerCase()}`}
+                    placeholderTextColor="#999"
+                    keyboardType={key === 'yearsOfExperience' ? 'numeric' : 'default'}
+                  />
+                </View>
               ) : (
-                <Text style={styles.fieldValue}>{editableFields[key] || 'Not provided'}</Text>
-              )}
-              {editableFields.errors?.[key] && (
-                <Text style={styles.errorText}>{editableFields.errors[key]}</Text>
+                <View style={styles.fieldValueContainer}>
+                  <View style={styles.fieldIconWrapper}>
+                    <Icon name={icon} size={18} color="#1a237e" />
+                  </View>
+                  <Text style={styles.fieldValue}>{editableFields[key] || 'Not provided'}</Text>
+                </View>
               )}
             </View>
           ))}
         </View>
 
+        {/* Services Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Services Offered</Text>
+          <View style={styles.sectionHeader}>
+            <Icon name="room-service" size={20} color="#1a237e" />
+            <Text style={styles.sectionTitle}>Services Offered</Text>
+          </View>
 
           {editing && (
-            <View style={styles.editingBanner}>
-              <MaterialIcons name="info-outline" size={20} color="#FFC107" />
-              <Text style={styles.editingText}>
-                You can edit your services here. After making changes, tap the save icon on the top right to save.
+            <View style={styles.infoCard}>
+              <View style={styles.infoIconWrapper}>
+                <Icon name="info" size={18} color="#1976d2" />
+              </View>
+              <Text style={styles.infoText}>
+                Edit your services here. Changes will be saved when you tap the save button.
               </Text>
             </View>
           )}
 
           {(!editableFields.services || editableFields.services.length === 0) ? (
-            <Text style={styles.noServicesText}>
-              No services listed. Add services to display them here.
-            </Text>
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIconContainer}>
+                <Icon name="room-service" size={48} color="#e0e0e0" />
+              </View>
+              <Text style={styles.emptyTitle}>No Services Added</Text>
+              <Text style={styles.emptyText}>
+                {editing ? "Add services below to get started" : "Enable editing to add services"}
+              </Text>
+            </View>
           ) : (
             editableFields.services.map((service, index) => (
               <View key={index} style={styles.serviceCard}>
@@ -746,35 +796,56 @@ const UserAccount = ({ route, navigation }) => {
                   <TouchableOpacity 
                     style={styles.deleteServiceButton} 
                     onPress={() => confirmDeleteService(service.id || service._id, index)}
+                    activeOpacity={0.7}
                   >
-                    <MaterialIcons name="delete" size={24} color="#fff" />
+                    <Icon name="delete" size={20} color="#fff" />
                   </TouchableOpacity>
                 )}
 
-                <Text style={styles.serviceName}>{service.name}</Text>
-                <Text style={styles.serviceDetail}>Category: {service.category}</Text>
+                <View style={styles.serviceHeader}>
+                  <View style={styles.serviceIconWrapper}>
+                    <Icon name="room-service" size={24} color="#1a237e" />
+                  </View>
+                  <View style={styles.serviceInfo}>
+                    <Text style={styles.serviceName}>{service.name}</Text>
+                    <Text style={styles.serviceCategory}>{service.category}</Text>
+                  </View>
+                </View>
 
                 {editing ? (
-                  <View style={styles.serviceEditRow}>
-                    <TextInput
-                      style={styles.priceInput}
-                      value={service.price || ""}
-                      keyboardType="numeric"
-                      onChangeText={(text) => updateService(index, "price", text)}
-                    />
-                    <Picker
-                      selectedValue={service.priceType || "hour"}
-                      onValueChange={(value) => updateService(index, "priceType", value)}
-                      style={styles.priceTypePicker}
-                    >
-                      <Picker.Item label="Per Hour" value="hour" />
-                      <Picker.Item label="One-Time" value="once-off" />
-                    </Picker>
+                  <View style={styles.serviceEditContainer}>
+                    <View style={styles.priceEditGroup}>
+                      <Text style={styles.editLabel}>Price (N$)</Text>
+                      <TextInput
+                        style={styles.priceInput}
+                        value={service.price || ""}
+                        keyboardType="numeric"
+                        onChangeText={(text) => updateService(index, "price", text)}
+                        placeholder="0.00"
+                        placeholderTextColor="#999"
+                      />
+                    </View>
+                    <View style={styles.priceTypeGroup}>
+                      <Text style={styles.editLabel}>Pricing Type</Text>
+                      <View style={styles.pickerWrapper}>
+                        <Picker
+                          selectedValue={service.priceType || "hour"}
+                          onValueChange={(value) => updateService(index, "priceType", value)}
+                          style={styles.priceTypePicker}
+                        >
+                          <Picker.Item label="Per Hour" value="hour" />
+                          <Picker.Item label="One-Time" value="once-off" />
+                        </Picker>
+                      </View>
+                    </View>
                   </View>
                 ) : (
-                  <Text style={styles.servicePrice}>
-                    N$ {service.price} ({service.priceType})
-                  </Text>
+                  <View style={styles.servicePriceContainer}>
+                    <Icon name="attach-money" size={16} color="#4CAF50" />
+                    <Text style={styles.servicePrice}>
+                      N$ {service.price} / {service.priceType === 'hour' ? 'hour' : 'one-time'}
+                    </Text>
+                  </View>
                 )}
               </View>
             ))
@@ -794,64 +865,90 @@ const UserAccount = ({ route, navigation }) => {
           )}
         </View>
 
+        {/* Operating Hours Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Operating Hours</Text>
+          <View style={styles.sectionHeader}>
+            <Icon name="schedule" size={20} color="#1a237e" />
+            <Text style={styles.sectionTitle}>Operating Hours</Text>
+          </View>
+
           {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => {
             const hours = editableFields.operatingHours?.[day] || { isClosed: false, start: "", end: "" };
 
             return (
               <View key={day} style={styles.hourRow}>
-                <Text style={styles.dayName}>{day}</Text>
+                <View style={styles.dayColumn}>
+                  <Text style={styles.dayName}>{day.substring(0, 3)}</Text>
+                  <Text style={styles.dayFull}>{day}</Text>
+                </View>
+
                 {editing ? (
-                  <View style={styles.hoursInputContainer}>
-                    <Switch
-                      value={!hours.isClosed}
-                      onValueChange={() => toggleDayClosed(day)}
-                      trackColor={{ false: "#ccc", true: "#1a237e" }}
-                      thumbColor={!hours.isClosed ? "#fff" : "#f4f3f4"}
-                    />
-                    {!hours.isClosed ? (
-                      <>
+                  <View style={styles.hoursEditContainer}>
+                    <View style={styles.switchContainer}>
+                      <Text style={styles.switchLabel}>{!hours.isClosed ? 'Open' : 'Closed'}</Text>
+                      <Switch
+                        value={!hours.isClosed}
+                        onValueChange={() => toggleDayClosed(day)}
+                        trackColor={{ false: "#e0e0e0", true: "#c5cae9" }}
+                        thumbColor={!hours.isClosed ? "#1a237e" : "#999"}
+                      />
+                    </View>
+                    {!hours.isClosed && (
+                      <View style={styles.timeInputsRow}>
                         <TouchableOpacity
-                          style={styles.timeInput}
+                          style={styles.timeInputButton}
                           onPress={() => {
                             setActiveTimeField(`${day}.start`);
                             setShowTimePicker(true);
                           }}
+                          activeOpacity={0.7}
                         >
-                          <Text style={styles.timeText}>{hours.start || "Start"}</Text>
+                          <Icon name="access-time" size={16} color="#1a237e" />
+                          <Text style={styles.timeButtonText}>{hours.start || "Start"}</Text>
                         </TouchableOpacity>
-                        <Text style={styles.timeSeparator}>-</Text>
+                        <Text style={styles.timeSeparator}>—</Text>
                         <TouchableOpacity
-                          style={styles.timeInput}
+                          style={styles.timeInputButton}
                           onPress={() => {
                             setActiveTimeField(`${day}.end`);
                             setShowTimePicker(true);
                           }}
+                          activeOpacity={0.7}
                         >
-                          <Text style={styles.timeText}>{hours.end || "End"}</Text>
+                          <Icon name="access-time" size={16} color="#1a237e" />
+                          <Text style={styles.timeButtonText}>{hours.end || "End"}</Text>
                         </TouchableOpacity>
-                      </>
-                    ) : (
-                      <Text style={styles.closedText}>Closed</Text>
+                      </View>
                     )}
                   </View>
                 ) : (
-                  <Text style={styles.hours}>
-                    {hours.isClosed
-                      ? "Closed"
-                      : hours.start && hours.end
-                      ? `${hours.start} - ${hours.end}`
-                      : "Not specified"}
-                  </Text>
+                  <View style={styles.hoursDisplayContainer}>
+                    {hours.isClosed ? (
+                      <View style={styles.closedBadge}>
+                        <Icon name="block" size={14} color="#d32f2f" />
+                        <Text style={styles.closedText}>Closed</Text>
+                      </View>
+                    ) : hours.start && hours.end ? (
+                      <View style={styles.openBadge}>
+                        <Icon name="access-time" size={14} color="#4CAF50" />
+                        <Text style={styles.hours}>{`${hours.start} - ${hours.end}`}</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.notSpecifiedText}>Not specified</Text>
+                    )}
+                  </View>
                 )}
               </View>
             );
           })}
         </View>
 
+        {/* Business Images Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Business Images</Text>
+          <View style={styles.sectionHeader}>
+            <Icon name="photo-library" size={20} color="#1a237e" />
+            <Text style={styles.sectionTitle}>Business Images</Text>
+          </View>
           <ImageGallery
             images={editableFields.images || []}
             editing={editing}
@@ -859,111 +956,175 @@ const UserAccount = ({ route, navigation }) => {
             onAddImage={pickNewBusinessImage}
           />
           {!editing && editableFields.images?.length === 0 && (
-            <Text style={styles.noImagesText}>
-              No images added yet. Tap the edit icon to add business images.
-            </Text>
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIconContainer}>
+                <Icon name="photo-library" size={48} color="#e0e0e0" />
+              </View>
+              <Text style={styles.emptyTitle}>No Images Added</Text>
+              <Text style={styles.emptyText}>Enable editing to add business photos</Text>
+            </View>
           )}
         </View>
 
+        {/* Social Media Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Social Media Links</Text>
-          {Object.entries(editableFields.socialLinks || {}).map(([platform, link]) => (
-            <View key={platform} style={styles.socialLink}>
-              <MaterialIcons name="link" size={24} color="#1a237e" />
-              {editing ? (
-                <TextInput
-                  style={styles.socialLinkInput}
-                  value={link}
-                  onChangeText={(text) =>
-                    setEditableFields((prev) => ({
-                      ...prev,
-                      socialLinks: {
-                        ...prev.socialLinks,
-                        [platform]: text,
-                      },
-                    }))
-                  }
-                  placeholder={`Enter ${platform} URL`}
-                />
-              ) : (
-                <Text style={styles.socialLinkText}>
-                  {platform.charAt(0).toUpperCase() + platform.slice(1)}: {link || 'Not provided'}
+          <View style={styles.sectionHeader}>
+            <Icon name="share" size={20} color="#1a237e" />
+            <Text style={styles.sectionTitle}>Social Media Links</Text>
+          </View>
+
+          {Object.entries(editableFields.socialLinks || {}).map(([platform, link]) => {
+            const platformIcons = {
+              facebook: 'facebook',
+              twitter: 'flutter-dash',
+              instagram: 'photo-camera',
+              linkedin: 'business'
+            };
+
+            return (
+              <View key={platform} style={styles.field}>
+                <Text style={styles.fieldLabel}>
+                  {platform.charAt(0).toUpperCase() + platform.slice(1)}
                 </Text>
-              )}
-            </View>
-          ))}
+                {editing ? (
+                  <View style={styles.inputContainer}>
+                    <View style={styles.inputIconWrapper}>
+                      <Icon name={platformIcons[platform] || 'link'} size={20} color="#1a237e" />
+                    </View>
+                    <TextInput
+                      style={styles.input}
+                      value={link}
+                      onChangeText={(text) =>
+                        setEditableFields((prev) => ({
+                          ...prev,
+                          socialLinks: {
+                            ...prev.socialLinks,
+                            [platform]: text,
+                          },
+                        }))
+                      }
+                      placeholder={`Enter ${platform} URL`}
+                      placeholderTextColor="#999"
+                    />
+                  </View>
+                ) : (
+                  <View style={styles.fieldValueContainer}>
+                    <View style={styles.fieldIconWrapper}>
+                      <Icon name={platformIcons[platform] || 'link'} size={18} color="#1a237e" />
+                    </View>
+                    <Text style={styles.fieldValue}>{link || 'Not provided'}</Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </View>
       </>
     );
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      {loading ? (
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1a237e" />
+          <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
-      ) : !userDetails ? (
+      </SafeAreaView>
+    );
+  }
+
+  if (!userDetails) {
+    return (
+      <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text>No user details found</Text>
+          <Icon name="error-outline" size={64} color="#e0e0e0" />
+          <Text style={styles.emptyTitle}>No Profile Found</Text>
+          <Text style={styles.emptyText}>Unable to load user details</Text>
         </View>
-      ) : (
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          <View style={styles.header}>
-            <View style={styles.avatarWrapper}>
-              <TouchableOpacity onPress={() => setBottomSidebarVisible(true)}>
-                <Image
-                  source={{
-                    uri: userDetails?.profileImage && typeof userDetails.profileImage === "string"
-                      ? `https://service-booking-backend-eb9i.onrender.com/${userDetails.profileImage.replace(/\\/g, "/")}`
-                      : "https://service-booking-backend-eb9i.onrender.com/uploads/default-profile.png",
-                  }}
-                  style={styles.profileImage}
-                  resizeMode="cover"
-                />
-                <View style={styles.cameraOverlay}>
-                  <MaterialIcons name="camera-alt" size={30} color="#fff" />
-                </View>
-              </TouchableOpacity>
-            </View>
+      </SafeAreaView>
+    );
+  }
 
-            <View style={styles.headerTextContainer}>
-              <Text style={styles.userName}>{userDetails.name}</Text>
-              <View style={styles.roleBadge}>
-                <Text style={styles.roleText}>{userDetails.role}</Text>
-              </View>
+  return (
+    <SafeAreaView style={styles.container}>
+      <Toast />
+      
+      {/* Header with Back Button and Save */}
+      <View style={styles.topHeader}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
+        >
+          <View style={styles.backButtonInner}>
+            <Icon name="arrow-back" size={24} color="#1a237e" />
+          </View>
+        </TouchableOpacity>
+        <Text style={styles.topHeaderTitle}>My Profile</Text>
+        <TouchableOpacity
+          style={[styles.editButtonTop, editing && styles.saveButtonTop]}
+          onPress={() => editing ? saveChanges() : setEditing(true)}
+          activeOpacity={0.7}
+        >
+          <Icon name={editing ? "check" : "edit"} size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
-              <View style={styles.statusBadgeContainer}>
-                <View style={[styles.statusBadge, userDetails?.completeProfile ? styles.completeBadge : styles.incompleteBadge]}>
-                  <MaterialIcons 
-                    name={userDetails?.completeProfile ? "verified" : "warning"} 
-                    size={20} 
-                    color={userDetails?.completeProfile ? "#4CAF50" : "#FF9800"} 
-                  />
-                  <Text style={[styles.statusText, { color: userDetails?.completeProfile ? "#4CAF50" : "#FF9800" }]}>
-                    {userDetails?.completeProfile ? "Profile Complete" : "Complete Your Profile"}
-                  </Text>
-                </View>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Profile Header */}
+        <View style={styles.profileHeader}>
+          <TouchableOpacity 
+            onPress={() => setBottomSidebarVisible(true)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.avatarContainer}>
+              <Image
+                source={{
+                  uri: userDetails?.profileImage && typeof userDetails.profileImage === "string"
+                    ? `https://service-booking-backend-eb9i.onrender.com/${userDetails.profileImage.replace(/\\/g, "/")}`
+                    : "https://service-booking-backend-eb9i.onrender.com/uploads/default-profile.png",
+                }}
+                style={styles.profileImage}
+                resizeMode="cover"
+              />
+              <View style={styles.cameraOverlay}>
+                <Icon name="camera-alt" size={20} color="#fff" />
               </View>
             </View>
+          </TouchableOpacity>
+
+          <Text style={styles.userName}>{userDetails.name}</Text>
+          
+          <View style={styles.roleBadge}>
+            <Icon name="verified-user" size={14} color="#1a237e" />
+            <Text style={styles.roleText}>{userDetails.role}</Text>
           </View>
 
-          <View style={styles.contentCard}>
-            <View style={styles.contentHeader}>
-              <Text style={styles.contentTitle}>Account Details</Text>
-              <TouchableOpacity
-                style={[styles.editButton, editing && styles.saveButton]}
-                onPress={() => editing ? saveChanges() : setEditing(true)}
-              >
-                <MaterialIcons name={editing ? "check" : "edit"} size={28} color="#fff" />
-              </TouchableOpacity>
-            </View>
-
-            {renderBasicInfo()}
-            {renderProviderInfo()}
+          <View style={[
+            styles.statusBadge,
+            userDetails?.completeProfile ? styles.completeBadge : styles.incompleteBadge
+          ]}>
+            <Icon 
+              name={userDetails?.completeProfile ? "check-circle" : "info"} 
+              size={16} 
+              color={userDetails?.completeProfile ? "#4CAF50" : "#FF9800"} 
+            />
+            <Text style={[
+              styles.statusText,
+              { color: userDetails?.completeProfile ? "#4CAF50" : "#FF9800" }
+            ]}>
+              {userDetails?.completeProfile ? "Profile Complete" : "Complete Your Profile"}
+            </Text>
           </View>
-        </ScrollView>
-      )}
+        </View>
+
+        {/* Content Sections */}
+        <View style={styles.contentContainer}>
+          {renderBasicInfo()}
+          {renderProviderInfo()}
+        </View>
+      </ScrollView>
 
       {renderBottomSidebar()}
 
@@ -989,412 +1150,619 @@ const UserAccount = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f7fa',
+    backgroundColor: '#f8f9fc',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: '#f5f7fa',
+    paddingHorizontal: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 14,
+    color: "#666",
+  },
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  backButton: {},
+  backButtonInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(26, 35, 126, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topHeaderTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a237e',
+    textAlign: 'center',
+    marginHorizontal: 12,
+  },
+  editButtonTop: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#1a237e',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#1a237e',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  saveButtonTop: {
+    backgroundColor: '#4CAF50',
   },
   scrollView: {
     flex: 1,
   },
-  header: {
-    backgroundColor: '#1a237e',
-    paddingTop: 60,
-    paddingBottom: 80,
+  profileHeader: {
+    backgroundColor: '#fff',
+    paddingTop: 32,
+    paddingBottom: 24,
+    paddingHorizontal: 24,
     alignItems: 'center',
-    position: 'relative',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
-  avatarWrapper: {
-    position: 'absolute',
-    bottom: -50,
-    zIndex: 10,
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 16,
   },
   profileImage: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    borderWidth: 8,
-    borderColor: '#fff',
-    backgroundColor: '#e9ecef',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 20,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 4,
+    borderColor: '#f0f0f0',
+    backgroundColor: '#e0e0e0',
   },
   cameraOverlay: {
     position: 'absolute',
-    bottom: 8,
-    right: 8,
+    bottom: 0,
+    right: 0,
     backgroundColor: '#1a237e',
-    padding: 14,
-    borderRadius: 34,
-    borderWidth: 5,
+    padding: 10,
+    borderRadius: 20,
+    borderWidth: 3,
     borderColor: '#fff',
   },
-  headerTextContainer: {
-    alignItems: 'center',
-    marginTop: 20,
-  },
   userName: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: '800',
-    color: '#fff',
-    marginTop: 16,
+    color: '#1a237e',
+    marginBottom: 8,
+    textAlign: 'center',
   },
   roleBadge: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 32,
-    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(26, 35, 126, 0.08)',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 6,
+    marginBottom: 12,
   },
   roleText: {
-    color: '#fff',
-    fontSize: 17,
+    color: '#1a237e',
+    fontSize: 13,
     fontWeight: '700',
-  },
-  statusBadgeContainer: {
-    marginTop: 20,
-    marginBottom: 50,
+    textTransform: 'uppercase',
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 32,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
   },
   completeBadge: {
-    backgroundColor: 'rgba(76, 175, 80, 0.25)',
+    backgroundColor: '#e8f5e9',
   },
   incompleteBadge: {
-    backgroundColor: 'rgba(255, 152, 0, 0.25)',
+    backgroundColor: '#fff3e0',
   },
   statusText: {
-    marginLeft: 12,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
   },
-  contentCard: {
-    backgroundColor: '#ffffff',
-    marginTop: -40,
-    borderTopLeftRadius: 36,
-    borderTopRightRadius: 36,
-    paddingTop: 80,
-    paddingHorizontal: 24,
-    paddingBottom: 60,
-    elevation: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-  },
-  contentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  contentTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#1a237e',
-  },
-  editButton: {
-    backgroundColor: '#1a237e',
-    padding: 18,
-    borderRadius: 20,
-    elevation: 6,
-  },
-  saveButton: {
-    backgroundColor: '#4CAF50',
+  contentContainer: {
+    padding: 20,
   },
   section: {
-    marginBottom: 40,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1a237e',
-    marginBottom: 20,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  field: {
-    marginBottom: 24,
-  },
-  fieldLabel: {
-    fontSize: 15,
-    color: '#555',
-    fontWeight: '600',
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  fieldValue: {
-    fontSize: 18,
-    color: '#212529',
-    fontWeight: '600',
-    backgroundColor: '#f8f9fa',
-    paddingVertical: 18,
-    paddingHorizontal: 20,
+    backgroundColor: '#fff',
     borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
-  input: {
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 16,
-    padding: 18,
-    fontSize: 17,
-  },
-  errorInput: {
-    borderColor: '#F44336',
-  },
-  errorText: {
-    color: '#F44336',
-    fontSize: 13,
-    marginTop: 8,
-    marginLeft: 4,
-  },
-  passwordButton: {
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f2f5',
-    padding: 18,
-    borderRadius: 16,
-    marginTop: 12,
-  },
-  passwordButtonText: {
-    color: '#1a237e',
-    fontSize: 17,
-    fontWeight: '600',
-    marginLeft: 14,
-  },
-  editingBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFF3E0",
-    padding: 16,
-    borderRadius: 16,
     marginBottom: 20,
-    borderLeftWidth: 5,
-    borderLeftColor: "#FFC107",
+    paddingBottom: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: '#f0f0f0',
+    gap: 8,
   },
-  editingText: {
-    color: "#333",
-    fontSize: 15,
-    fontWeight: "500",
-    marginLeft: 12,
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a237e',
+    letterSpacing: -0.3,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    backgroundColor: '#e3f2fd',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#1976d2',
+  },
+  infoIconWrapper: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#1976d2',
+    lineHeight: 18,
+  },
+  field: {
+    marginBottom: 20,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fc',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
+    paddingHorizontal: 16,
+    height: 56,
+  },
+  errorInputContainer: {
+    borderColor: '#d32f2f',
+  },
+  inputIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(26, 35, 126, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1a237e',
+    paddingVertical: 0,
+  },
+  fieldValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fc',
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+  },
+  fieldIconWrapper: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(26, 35, 126, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fieldValue: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1a237e',
+    fontWeight: '500',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 6,
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#d32f2f',
     flex: 1,
   },
-  noServicesText: {
-    textAlign: "center",
-    color: "#666",
-    fontSize: 17,
-    fontStyle: "italic",
-    paddingVertical: 24,
-    backgroundColor: "#f8f9fa",
-    borderRadius: 16,
+  passwordToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(26, 35, 126, 0.05)',
+    padding: 16,
+    borderRadius: 14,
+    marginTop: 8,
   },
-  serviceCard: {
-    backgroundColor: "#fff",
-    padding: 24,
-    borderRadius: 20,
-    marginBottom: 20,
-    elevation: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    position: "relative",
+  passwordIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  deleteServiceButton: {
-    position: "absolute",
-    top: 16,
-    right: 16,
-    backgroundColor: "#F44336",
-    borderRadius: 28,
-    width: 48,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 6,
+  passwordToggleText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a237e',
   },
-  serviceName: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#1a237e",
-    marginBottom: 8,
+  passwordFieldsContainer: {
+    marginTop: 16,
   },
-  serviceDetail: {
-    fontSize: 16,
-    color: "#666",
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  emptyIconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
   },
-  servicePrice: {
+  emptyTitle: {
     fontSize: 18,
-    fontWeight: "700",
-    color: "#4CAF50",
-    backgroundColor: "#E8F5E9",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-    alignSelf: "flex-start",
+    fontWeight: '700',
+    color: '#1a237e',
+    marginBottom: 6,
   },
-  serviceEditRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 16,
-    gap: 16,
+  emptyText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+  },
+  serviceCard: {
+    backgroundColor: '#f8f9fc',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  deleteServiceButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: '#d32f2f',
+    borderRadius: 20,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  serviceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  serviceIconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(26, 35, 126, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  serviceInfo: {
+    flex: 1,
+  },
+  serviceName: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1a237e',
+    marginBottom: 4,
+  },
+  serviceCategory: {
+    fontSize: 14,
+    color: '#666',
+  },
+  serviceEditContainer: {
+    gap: 12,
+  },
+  priceEditGroup: {
+    flex: 1,
+  },
+  priceTypeGroup: {
+    flex: 1,
+  },
+  editLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 6,
+    textTransform: 'uppercase',
   },
   priceInput: {
-    flex: 1,
+    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 16,
-    padding: 16,
-    backgroundColor: "#f8f9fa",
-    fontSize: 17,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    color: '#1a237e',
+  },
+  pickerWrapper: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   priceTypePicker: {
-    flex: 1,
-    backgroundColor: "#f8f9fa",
-    borderRadius: 16,
+    height: 50,
+  },
+  servicePriceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e8f5e9',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    gap: 4,
+  },
+  servicePrice: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#4CAF50',
   },
   hourRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  dayName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#1a237e',
-    width: 110,
-  },
-  hours: {
-    fontSize: 17,
-    color: '#333',
-    fontWeight: '500',
-  },
-  closedText: {
-    color: '#F44336',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  hoursInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  timeInput: {
-    borderWidth: 1,
-    borderColor: '#1a237e',
-    borderRadius: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    minWidth: 100,
-    alignItems: 'center',
-  },
-  timeText: {
-    color: '#1a237e',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  timeSeparator: {
-    fontSize: 18,
-    color: '#666',
-    fontWeight: 'bold',
-  },
-  noImagesText: {
-    textAlign: 'center',
-    color: '#666',
-    fontSize: 17,
-    fontStyle: 'italic',
-    paddingVertical: 24,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 16,
-  },
-  socialLink: {
-    flexDirection: "row",
-    alignItems: "center",
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: '#f0f0f0',
   },
-  socialLinkText: {
-    fontSize: 17,
-    color: "#333",
-    marginLeft: 16,
-    flex: 1,
+  dayColumn: {
+    width: 80,
   },
-  socialLinkInput: {
+  dayName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a237e',
+    marginBottom: 2,
+  },
+  dayFull: {
+    fontSize: 12,
+    color: '#999',
+  },
+  hoursEditContainer: {
     flex: 1,
+    gap: 8,
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  switchLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a237e',
+  },
+  timeInputsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  timeInputButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 16,
-    padding: 18,
-    marginLeft: 16,
-    backgroundColor: "#f8f9fa",
-    fontSize: 17,
+    borderColor: '#1a237e',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 6,
+  },
+  timeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a237e',
+  },
+  timeSeparator: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#999',
+  },
+  hoursDisplayContainer: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  openBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e8f5e9',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    gap: 6,
+  },
+  hours: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4CAF50',
+  },
+  closedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffebee',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    gap: 6,
+  },
+  closedText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#d32f2f',
+  },
+  notSpecifiedText: {
+    fontSize: 14,
+    color: '#999',
+    fontStyle: 'italic',
   },
   bottomSidebarOverlay: {
     flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   bottomSidebar: {
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 28,
-    paddingTop: 28,
-    paddingBottom: 48,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    elevation: 30,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -12 },
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 16,
+      },
+    }),
+  },
+  sidebarHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
   },
   bottomSidebarTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#1a237e",
-    textAlign: "center",
-    marginBottom: 28,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1a237e',
+    textAlign: 'center',
+    marginBottom: 24,
   },
   optionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f8f9fa",
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    borderRadius: 20,
-    marginBottom: 20,
-    elevation: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fc',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    marginBottom: 12,
+  },
+  optionIconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(26, 35, 126, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
   },
   optionText: {
-    fontSize: 18,
-    color: "#333",
-    fontWeight: "600",
-    marginLeft: 20,
     flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a237e',
   },
   cancelButton: {
-    backgroundColor: "#ffebee",
-    marginTop: 12,
+    backgroundColor: '#fff',
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginTop: 8,
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
   },
   cancelText: {
-    color: "#F44336",
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    textAlign: 'center',
   },
 });
 

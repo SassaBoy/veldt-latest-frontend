@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, StatusBar } from 'react-native';
 import * as Progress from 'react-native-progress';
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
@@ -7,17 +7,15 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 const PRIMARY_COLOR = '#1a237e';
 const SECONDARY_COLOR = '#F8F9FF';
 const TEXT_COLOR = '#333333';
-const ACCENT_COLOR = '#4CAF50';
 
 const LoadingScreen = ({ navigation, route }) => {
   const { service } = route.params || {};
 
   useEffect(() => {
-    // Disable swipe back gesture and hide back button
     navigation.setOptions({
       gestureEnabled: false,
       headerLeft: () => null,
-      headerShown: false, // Hide header entirely for full-screen loading feel
+      headerShown: false, 
     });
 
     if (!service || !service.name) {
@@ -45,42 +43,51 @@ const LoadingScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
-      <Animated.View entering={FadeInUp.duration(800)}>
-        <MaterialIcons name="search" size={80} color={PRIMARY_COLOR} style={styles.icon} />
+      <StatusBar barStyle="dark-content" />
+      
+      {/* Decorative background element for a cleaner feel */}
+      <View style={styles.backgroundCircle} />
+
+      <Animated.View entering={FadeInUp.duration(800)} style={styles.iconContainer}>
+        <View style={styles.searchCircle}>
+          <MaterialIcons name="search" size={50} color="#FFF" />
+        </View>
       </Animated.View>
 
-      <Animated.View entering={FadeInDown.delay(400).duration(800)}>
+      <Animated.View entering={FadeInDown.delay(400).duration(800)} style={styles.textSection}>
         <Text style={styles.title}>
-          Finding the best providers...
+          Finding your Professional
         </Text>
         <Text style={styles.subtitle}>
-          Searching for top-rated {service.name} services near you
+          Connecting you with the best <Text style={styles.boldText}>{service.name}</Text> services in your area...
         </Text>
       </Animated.View>
 
       <View style={styles.progressContainer}>
-        <ActivityIndicator size="large" color={PRIMARY_COLOR} />
         <Progress.Bar
           indeterminate={true}
-          width={280}
-          height={8}
+          width={width * 0.7}
+          height={6}
           color={PRIMARY_COLOR}
-          unfilledColor="#e0e0e0"
+          unfilledColor="rgba(26, 35, 126, 0.1)"
           borderWidth={0}
           borderRadius={12}
-          style={styles.progressBar}
           animationType="timing"
         />
+        <Text style={styles.statusText}>Searching for matches...</Text>
       </View>
 
-      <Animated.View entering={FadeInDown.delay(800).duration(1000)}>
+      <Animated.View entering={FadeInDown.delay(800).duration(1000)} style={styles.footer}>
+        <ActivityIndicator size="small" color={PRIMARY_COLOR} style={{ marginBottom: 10 }} />
         <Text style={styles.tipText}>
-          This usually takes just a few seconds
+          Quality takes a moment
         </Text>
       </Animated.View>
     </View>
   );
 };
+
+const { width, height } = require('react-native').Dimensions.get('window');
 
 const styles = StyleSheet.create({
   container: {
@@ -88,41 +95,77 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: SECONDARY_COLOR,
-    paddingHorizontal: 32,
+    paddingHorizontal: 40,
   },
-  icon: {
-    marginBottom: 32,
-    opacity: 0.9,
+  backgroundCircle: {
+    position: 'absolute',
+    width: width * 1.5,
+    height: width * 1.5,
+    borderRadius: width,
+    backgroundColor: 'rgba(26, 35, 126, 0.03)',
+    top: -width * 0.8,
+  },
+  iconContainer: {
+    marginBottom: 40,
+  },
+  searchCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: PRIMARY_COLOR,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 10,
+    shadowColor: PRIMARY_COLOR,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+  },
+  textSection: {
+    alignItems: 'center',
+    marginBottom: 50,
   },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '800',
     color: PRIMARY_COLOR,
     textAlign: 'center',
     marginBottom: 12,
-    letterSpacing: 0.5,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 18,
-    color: TEXT_COLOR,
+    fontSize: 16,
+    color: '#666',
     textAlign: 'center',
-    marginBottom: 48,
-    lineHeight: 26,
-    fontWeight: '500',
+    lineHeight: 24,
+    paddingHorizontal: 10,
+  },
+  boldText: {
+    color: PRIMARY_COLOR,
+    fontWeight: '700',
   },
   progressContainer: {
     alignItems: 'center',
-    marginBottom: 48,
+    width: '100%',
   },
-  progressBar: {
-    marginTop: 24,
+  statusText: {
+    marginTop: 15,
+    fontSize: 14,
+    fontWeight: '600',
+    color: PRIMARY_COLOR,
+    opacity: 0.6,
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 50,
+    alignItems: 'center',
   },
   tipText: {
-    fontSize: 15,
-    color: '#666666',
+    fontSize: 13,
+    color: '#999',
     textAlign: 'center',
-    fontStyle: 'italic',
-    opacity: 0.8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   errorText: {
     fontSize: 18,
@@ -130,7 +173,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 24,
     fontWeight: '600',
-    lineHeight: 26,
   },
 });
 

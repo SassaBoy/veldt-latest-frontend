@@ -17,7 +17,7 @@ import Icon from "react-native-vector-icons/Ionicons";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import RNPickerSelect from "react-native-picker-select";
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
 const { width } = Dimensions.get("window");
 
 const ServiceProvidersPage = ({ route }) => {
@@ -81,6 +81,7 @@ const ServiceProvidersPage = ({ route }) => {
     fetchProviders(locationQuery.trim());
   };
 
+  // RESTORED ORIGINAL SORT LOGIC
   const sortedProviders = useMemo(() => {
     return [...serviceProviders].sort((a, b) => {
       const priceA = a.servicePrice ? parseFloat(a.servicePrice) : Infinity;
@@ -110,16 +111,6 @@ const ServiceProvidersPage = ({ route }) => {
       averageRating: provider.averageRating,
       providerId: provider.id,
     });
-  };
-
-  const getSortLabel = () => {
-    const labels = {
-      default: "Relevance",
-      priceLow: "Price: Low to High",
-      priceHigh: "Price: High to Low",
-      ratingHigh: "Highest Rated",
-    };
-    return labels[sortOption];
   };
 
   const renderProvider = ({ item }) => (
@@ -179,7 +170,7 @@ const ServiceProvidersPage = ({ route }) => {
               </View>
             )}
             <View style={styles.arrowContainer}>
-              <Icon name="chevron-forward" size={24} color="#adb5bd" />
+              <Icon name="chevron-forward" size={24} color="#1a237e" />
             </View>
           </View>
         </View>
@@ -190,23 +181,11 @@ const ServiceProvidersPage = ({ route }) => {
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
       {loading ? (
-        <>
-          <ActivityIndicator size="large" color="#1a237e" />
-          <Text style={styles.emptyText}>
-            {locationQuery ? `Searching in ${locationQuery}...` : "Finding nearby providers..."}
-          </Text>
-        </>
+        <ActivityIndicator size="large" color="#1a237e" />
       ) : (
         <>
           <Icon name="search-outline" size={80} color="#ccc" />
-          <Text style={styles.emptyText}>
-            {locationQuery
-              ? `No providers found in ${locationQuery}`
-              : "No providers available for this service"}
-          </Text>
-          <Text style={styles.emptySubtext}>
-            Try adjusting your location or check back later
-          </Text>
+          <Text style={styles.emptyText}>No providers found</Text>
         </>
       )}
     </View>
@@ -215,11 +194,11 @@ const ServiceProvidersPage = ({ route }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
+        {/* Added padding here to stop Domestic Cleaning from cutting off */}
         <Text style={styles.title}>{serviceName} Providers</Text>
-        <Text style={styles.subtitle}>Choose from trusted professionals</Text>
+        <Text style={styles.subtitle}>Trusted professionals near you</Text>
         <Text style={styles.resultCount}>
-          {sortedProviders.length} {sortedProviders.length === 1 ? "provider" : "providers"} found
-          {locationQuery && ` in ${locationQuery}`}
+          {sortedProviders.length} available
         </Text>
       </View>
 
@@ -228,7 +207,7 @@ const ServiceProvidersPage = ({ route }) => {
           <Icon name="location-outline" size={22} color="#666" />
           <TextInput
             style={styles.locationInput}
-            placeholder="Town or city (e.g. Windhoek)"
+            placeholder="Search location..."
             placeholderTextColor="#999"
             value={locationQuery}
             onChangeText={setLocationQuery}
@@ -246,7 +225,7 @@ const ServiceProvidersPage = ({ route }) => {
           </View>
           <View style={styles.pickerWrapper}>
             <RNPickerSelect
-              onValueChange={setSortOption}
+              onValueChange={(value) => setSortOption(value)}
               items={[
                 { label: "Relevance", value: "default" },
                 { label: "Price: Low → High", value: "priceLow" },
@@ -255,7 +234,6 @@ const ServiceProvidersPage = ({ route }) => {
               ]}
               value={sortOption}
               style={pickerSelectStyles}
-              placeholder={{}}
               useNativeAndroidPickerStyle={false}
               Icon={() => (
                 <View style={styles.pickerIcon}>
@@ -274,10 +252,6 @@ const ServiceProvidersPage = ({ route }) => {
         ListEmptyComponent={renderEmpty}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
-        initialNumToRender={10}
-        maxToRenderPerBatch={15}
-        windowSize={15}
-        removeClippedSubviews={true}
       />
     </SafeAreaView>
   );
@@ -292,7 +266,7 @@ const pickerSelectStyles = {
     paddingHorizontal: 12,
     paddingRight: 36,
     borderRadius: 12,
-    backgroundColor: 'rgba(26, 35, 126, 0.05)',
+    backgroundColor: '#f0f2f8',
   },
   inputAndroid: {
     fontSize: 15,
@@ -302,256 +276,86 @@ const pickerSelectStyles = {
     paddingHorizontal: 12,
     paddingRight: 36,
     borderRadius: 12,
-    backgroundColor: 'rgba(26, 35, 126, 0.05)',
+    backgroundColor: '#f0f2f8',
   },
-  placeholder: {
-    color: '#1a237e',
-    fontWeight: '600',
-  },
-  iconContainer: {
-    top: Platform.OS === 'ios' ? 12 : 10,
-    right: 12,
-  },
+  placeholder: { color: '#1a237e' },
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f7fa',
-  },
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
   header: {
     backgroundColor: '#1a237e',
-    paddingTop: 60,
-    paddingBottom: 40,
+    paddingTop: Platform.OS === 'ios' ? 50 : 70, // Pushed down further
+    paddingBottom: 30,
     paddingHorizontal: 24,
-    borderBottomLeftRadius: 36,
-    borderBottomRightRadius: 36,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
-  title: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.9)',
-    fontWeight: '500',
-    marginBottom: 12,
-  },
-  resultCount: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
-    fontWeight: '600',
-  },
-  filtersContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    backgroundColor: '#f5f7fa',
-  },
+  title: { fontSize: 26, fontWeight: '800', color: '#fff', marginBottom: 4 },
+  subtitle: { fontSize: 16, color: 'rgba(255,255,255,0.8)', marginBottom: 8 },
+  resultCount: { fontSize: 14, color: 'rgba(255,255,255,0.6)', fontWeight: '600' },
+  filtersContainer: { padding: 20 },
   locationSearch: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 24,
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
+    borderRadius: 15,
+    paddingHorizontal: 15,
+    marginBottom: 15,
+    elevation: 3,
     shadowOpacity: 0.1,
-    shadowRadius: 10,
   },
-  locationInput: {
-    flex: 1,
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    fontSize: 17,
-    color: '#333',
-  },
-  searchBtn: {
-    backgroundColor: '#1a237e',
-    padding: 14,
-    borderRadius: 20,
-  },
+  locationInput: { flex: 1, paddingVertical: 15, fontSize: 16, color: '#333' },
+  searchBtn: { backgroundColor: '#1a237e', padding: 10, borderRadius: 10 },
   sortContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: '#fff',
-    borderRadius: 24,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    borderRadius: 15,
+    paddingHorizontal: 15,
+    paddingVertical: 5,
+    elevation: 2,
   },
-  sortLabelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  sortLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  pickerWrapper: {
-    flex: 1,
-    marginLeft: 12,
-  },
-pickerIcon: {
-    position: 'absolute',
-    right: 12,
-    top: Platform.OS === 'ios' ? 1 : 12,
-  },
-  listContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
+  sortLabelContainer: { flexDirection: 'row', alignItems: 'center', marginRight: 10 },
+  sortLabel: { fontSize: 14, fontWeight: '700', color: '#1a237e', marginLeft: 5 },
+  pickerWrapper: { flex: 1 },
+  pickerIcon: { position: 'absolute', right: 10, top: 12 },
+  listContainer: { paddingHorizontal: 20, paddingBottom: 40 },
   providerCard: {
     backgroundColor: '#fff',
     borderRadius: 20,
     marginBottom: 16,
     elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 12,
+    shadowRadius: 10,
     overflow: 'hidden',
   },
-  cardContent: {
-    flexDirection: 'row',
-    padding: 16,
+  cardContent: { flexDirection: 'row', padding: 16 },
+  imageWrapper: { marginRight: 16 },
+  providerImage: { width: 90, height: 90, borderRadius: 15, backgroundColor: '#eee' },
+  detailsContainer: { flex: 1 },
+  headerRow: { marginBottom: 5 },
+  providerName: { fontSize: 18, fontWeight: '700', color: '#1a237e' },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  ratingBadge: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#fff8e1', 
+    paddingHorizontal: 6, 
+    paddingVertical: 2, 
+    borderRadius: 6 
   },
-  imageWrapper: {
-    marginRight: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
-  providerImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 16,
-    backgroundColor: '#e9ecef',
-  },
-  detailsContainer: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  nameAndRating: {
-    flex: 1,
-    gap: 6,
-  },
-  providerName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1a237e',
-    letterSpacing: -0.3,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  ratingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 160, 0, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-  },
-  ratingText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFA000',
-  },
-  reviewCount: {
-    fontSize: 13,
-    color: '#999',
-    fontWeight: '500',
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 8,
-  },
-  providerAddress: {
-    fontSize: 14,
-    color: '#666',
-    flex: 1,
-  },
-  description: {
-    fontSize: 14,
-    color: '#555',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  priceBadge: {
-    backgroundColor: '#E8F5E9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  priceText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#4CAF50',
-    letterSpacing: -0.2,
-  },
-  arrowContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyText: {
-    fontSize: 19,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 24,
-    fontWeight: '500',
-  },
-  emptySubtext: {
-    fontSize: 16,
-    color: '#999',
-    textAlign: 'center',
-    marginTop: 16,
-  },
+  ratingText: { fontSize: 12, fontWeight: '700', color: '#FFA000', marginLeft: 3 },
+  reviewCount: { fontSize: 12, color: '#999', marginLeft: 5 },
+  locationRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  providerAddress: { fontSize: 13, color: '#666', marginLeft: 4, flex: 1 },
+  description: { fontSize: 13, color: '#777', lineHeight: 18, marginBottom: 10 },
+  footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  priceBadge: { backgroundColor: '#e8f5e9', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  priceText: { fontSize: 15, fontWeight: '700', color: '#2e7d32' },
+  emptyContainer: { alignItems: 'center', marginTop: 50 },
+  emptyText: { marginTop: 10, color: '#999' },
 });
 
 export default ServiceProvidersPage;
