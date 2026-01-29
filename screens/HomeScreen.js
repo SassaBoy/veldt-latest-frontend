@@ -280,7 +280,14 @@ if (isLoggedIn) {
       handleRefresh();
     }, []);
     
-
+useEffect(() => {
+  // Preload advert images for faster display
+  adverts.forEach(ad => {
+    if (ad.image) {
+      Image.prefetch(ad.image).catch(() => {}); // silent fail if one can't load
+    }
+  });
+}, []);
    const adverts = [
   {
     id: 1,
@@ -1117,29 +1124,41 @@ const renderEarningsModal = () => (
   />
 </View>
 
-
-      <Text style={styles.sectionTitle}>Most Booked</Text>
-      <View style={styles.advertContainer}>
-        <Swiper
-          style={styles.adSwiper}
-          autoplay
-          autoplayTimeout={5}
-          showsPagination
-          dotStyle={styles.dot}
-          activeDotStyle={styles.activeDot}
-          paginationStyle={styles.pagination}
-        >
-          {adverts.map((ad) => (
-            <View key={ad.id} style={styles.adCard}>
-              <Image source={{ uri: ad.image, cache: 'force-cache' }} style={styles.adImage} />
-              <View style={styles.adContent}>
-                <Text style={styles.adTitle}>{ad.title}</Text>
-                <Text style={styles.adDescription}>{ad.description}</Text>
-              </View>
-            </View>
-          ))}
-        </Swiper>
+<Text style={styles.sectionTitle}>Most Booked</Text>
+<View style={styles.advertContainer}>
+  <Swiper
+    style={styles.adSwiper}
+    autoplay
+    autoplayTimeout={4}                    // faster rotation
+    showsPagination
+    dotStyle={styles.dot}
+    activeDotStyle={styles.activeDot}
+    paginationStyle={styles.pagination}
+    loadMinimal={true}                     // only load visible slides
+    loadMinimalSize={2}                    // preload only 2 ahead
+    removeClippedSubviews={false}          // prevents blank flashes
+  >
+    {adverts.map((ad) => (
+      <View key={ad.id} style={styles.adCard}>
+        <Image
+          source={{ 
+            uri: ad.image,
+            cache: 'force-cache',          // aggressive caching
+            priority: 'high'               // highest loading priority
+          }}
+          style={styles.adImage}
+          resizeMode="cover"
+          defaultSource={{ uri: 'https://via.placeholder.com/300x140/cccccc/ffffff?text=Loading...' }} // instant placeholder
+          onError={() => console.log("Image failed:", ad.image)}
+        />
+        <View style={styles.adContent}>
+          <Text style={styles.adTitle}>{ad.title}</Text>
+          <Text style={styles.adDescription}>{ad.description}</Text>
+        </View>
       </View>
+    ))}
+  </Swiper>
+</View>
     </ScrollView>
   );
 
@@ -1381,29 +1400,33 @@ categoryName: {
   fontStyle: 'italic',
 },
 
-  advertContainer: {
-    height: 220,
-    marginBottom: 24,
-  },
-  adSwiper: {
-    height: 200,
-  },
-  adCard: {
-    marginHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    overflow: 'hidden',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  adImage: {
-    width: '100%',
-    height: 120,
-    resizeMode: 'cover',
-  },
+advertContainer: {
+  height: 220,
+  marginBottom: 24,
+  overflow: 'hidden',
+},
+
+adSwiper: {
+  height: 200,
+},
+
+adCard: {
+  marginHorizontal: 16,
+  borderRadius: 16,
+  backgroundColor: '#fff',
+  overflow: 'hidden',
+  elevation: 4,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.15,
+  shadowRadius: 6,
+},
+
+adImage: {
+  width: '100%',
+  height: 140,                    // taller → better visual balance
+  backgroundColor: '#f0f0f0',     // light placeholder color while loading
+},
   adContent: {
     padding: 12,
   },
@@ -1564,7 +1587,8 @@ categoryName: {
   },
   closeSidebarButton: {
     alignSelf: 'flex-end',
-    marginBottom: 24,
+    marginTop: 40,
+    marginRight: 10,
   },
   sidebarHeader: {
     alignItems: 'center',
@@ -1825,13 +1849,13 @@ sectionTitle: {
     fontWeight: "400", // Regular weight for a clean look
   },
   
-  shareContainer: {
-    position: 'absolute',
-    bottom: 210, // Adjust this value to ensure visibility
-    right: 20,
-    zIndex: 999,
-    alignItems: "center",
-  },
+shareContainer: {
+  position: 'absolute',
+  bottom: 160,                    // ← was 210/230 → moved up ~50–70px
+  right: 20,
+  zIndex: 999,
+  alignItems: "center",
+},
   
   shareButton: {
     flexDirection: 'row',

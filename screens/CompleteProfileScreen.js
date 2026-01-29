@@ -10,6 +10,9 @@ import {
   Alert,
   Switch,
   Image,
+  Platform,
+  ActivityIndicator,
+  Dimensions,
 } from "react-native";
 import Toast from "react-native-toast-message";
 import { Picker } from "@react-native-picker/picker";
@@ -18,6 +21,8 @@ import Icon from "react-native-vector-icons/MaterialIcons";
 import * as ImagePicker from "expo-image-picker";
 import axios from "axios";
 import ServicesSection101 from "./ServicesSection101";
+
+const { width } = Dimensions.get("window");
 
 const CompleteProfileScreen = ({ route, navigation }) => {
   const { email } = route.params;
@@ -33,9 +38,9 @@ const CompleteProfileScreen = ({ route, navigation }) => {
     category: "",
     price: "",
     priceType: "",
-    description: "", 
+    description: "",
   });
-  
+
   const [socialLinks, setSocialLinks] = useState({
     website: "",
     facebook: "",
@@ -45,13 +50,14 @@ const CompleteProfileScreen = ({ route, navigation }) => {
     tiktok: "",
   });
   const [images, setImages] = useState([]);
-const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [timePicker, setTimePicker] = useState({
     isVisible: false,
     day: "",
     field: "",
   });
+
   const namibianTowns = [
     "Arandis",
     "Aranos",
@@ -105,9 +111,8 @@ const [loading, setLoading] = useState(false);
     "Tsumeb",
     "Usakos",
     "Walvis Bay",
-    "Windhoek"
+    "Windhoek",
   ];
-  
 
   const isFormValid = () => {
     return businessAddress && town && yearsOfExperience && services.length > 0;
@@ -118,17 +123,16 @@ const [loading, setLoading] = useState(false);
       Alert.alert("Error", "Please fill all fields to add a service.");
       return;
     }
-  
+
     if (services.find((s) => s.name === service.name && s.category === service.category)) {
       Alert.alert("Error", "Service already added in this category.");
       return;
     }
-  
+
     setServices([...services, service]);
     setNewService({ name: "", price: "", priceType: "" });
-    setCategory(""); // Reset the category selection
+    setCategory("");
   };
-  
 
   const updateOperatingHours = (day, field, value) => {
     setOperatingHours((prev) => ({
@@ -136,19 +140,20 @@ const [loading, setLoading] = useState(false);
       [day]: {
         ...prev[day],
         [field]: value,
-        isClosed: prev[day]?.isClosed || false, // Ensure `isClosed` is always defined
+        isClosed: prev[day]?.isClosed || false,
       },
     }));
   };
-  
 
   const handleTimePickerConfirm = (value) => {
     const { day, field } = timePicker;
-    updateOperatingHours(day, field, value.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+    updateOperatingHours(
+      day,
+      field,
+      value.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    );
     setTimePicker({ isVisible: false, day: "", field: "" });
   };
-
-  
 
   const toggleDayClosed = (day) => {
     setOperatingHours((prev) => ({
@@ -161,17 +166,17 @@ const [loading, setLoading] = useState(false);
       },
     }));
   };
+
   const handleSubmit = async () => {
     if (!isFormValid()) {
       Alert.alert("Error", "Please fill in all required fields.");
       return;
     }
-  
-    setLoading(true); // Start loading
-  
+
+    setLoading(true);
+
     const profileData = new FormData();
-  
-    // Append basic fields
+
     profileData.append("email", email);
     profileData.append("businessAddress", businessAddress);
     profileData.append("yearsOfExperience", yearsOfExperience);
@@ -180,18 +185,18 @@ const [loading, setLoading] = useState(false);
     profileData.append("operatingHours", JSON.stringify(operatingHours));
     profileData.append("socialLinks", JSON.stringify(socialLinks));
     profileData.append("description", description);
-  
-    // Append images
+
     images.forEach((image, index) => {
+      const uri = Platform.OS === "ios" ? image.uri.replace("file://", "") : image.uri;
+
       profileData.append("images", {
-        uri: image.uri,
+        uri: uri,
         type: "image/jpeg",
         name: `image_${index}.jpg`,
       });
     });
-  
+
     try {
-      // Make API call to complete profile
       const response = await axios.post(
         "https://service-booking-backend-eb9i.onrender.com/api/auth/complete-profile",
         profileData,
@@ -201,8 +206,7 @@ const [loading, setLoading] = useState(false);
           },
         }
       );
-  
-      // If there are custom services, post them separately
+
       const customServices = services.filter((service) => service.isCustom);
       if (customServices.length > 0) {
         await Promise.all(
@@ -215,390 +219,817 @@ const [loading, setLoading] = useState(false);
           )
         );
       }
-  
-      // Show success toast
+
       Toast.show({
         type: "success",
         text1: "Profile Completed",
         text2: "Your account has been successfully created!",
       });
-  
-      // Navigate to the next screen after a short delay
+
       setTimeout(() => {
         navigation.navigate("UploadDocuments", { email, profileData: response.data.profile });
-      }, 1000); // Add a small delay for better user experience
-  
+      }, 1000);
     } catch (error) {
       console.error("Error completing profile:", error.message);
-  
-      // Show error alert with a fallback message
+
       Alert.alert(
         "Error",
         error.response?.data?.message || "Failed to complete profile. Please try again."
       );
-  
     } finally {
-      setLoading(false); // Stop loading
+      setLoading(false);
     }
   };
-  
+
   const pickImage = async () => {
+    if (images.length >= 10) {
+      Alert.alert("Limit Reached", "You can upload a maximum of 10 images.");
+      return;
+    }
+
+    const remaining = 10 - images.length;
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
+      selectionLimit: remaining,
+      quality: 0.7,
     });
+
     if (!result.canceled) {
-      setImages((prev) => [...prev, ...result.assets]);
+      const newOnes = result.assets.slice(0, remaining);
+      setImages((prev) => [...prev, ...newOnes]);
     }
   };
 
-  const handleServiceSearch = (query) => {
-    setSearchQuery(query);
-    const filtered = availableServices.filter((service) => {
-      const searchString = `${service.name} (${service.category})`.toLowerCase();
-      return searchString.includes(query.toLowerCase());
-    });
-    setFilteredServices(filtered);
+  const removeImage = (indexToRemove) => {
+    setImages((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
+  const wordCount = description.split(/\s+/).filter(Boolean).length;
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
       <Toast />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
         <View style={styles.header}>
-          <Icon name="business" size={40} color="#1a237e" />
+          <View style={styles.iconContainer}>
+            <View style={styles.iconInnerCircle}>
+              <Icon name="business" size={48} color="#1a237e" />
+            </View>
+          </View>
           <Text style={styles.title}>Complete Your Profile</Text>
+          <Text style={styles.subtitle}>
+            Build your professional service provider profile
+          </Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Business Details</Text>
-        <View style={styles.inputContainer}>
-          <Icon name="location-on" size={20} color="#7F8C8D" style={styles.icon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Business Address"
-            value={businessAddress}
-            onChangeText={setBusinessAddress}
-          />
+        {/* Progress Indicator */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressSteps}>
+            <View style={[styles.progressStep, styles.progressStepActive]}>
+              <Icon name="check" size={16} color="#fff" />
+            </View>
+            <View style={styles.progressLine} />
+            <View style={[styles.progressStep, styles.progressStepActive]}>
+              <Text style={styles.progressStepText}>2</Text>
+            </View>
+            <View style={[styles.progressLine, styles.progressLineInactive]} />
+            <View style={styles.progressStep}>
+              <Text style={[styles.progressStepText, styles.progressStepTextInactive]}>3</Text>
+            </View>
+          </View>
+          <Text style={styles.progressLabel}>Profile Details</Text>
         </View>
-        <View style={styles.dropdownContainer}>
-          <Picker selectedValue={town} onValueChange={setTown}>
-            <Picker.Item label="Select Your Town/City" value="" />
-            {namibianTowns.map((townName, index) => (
-              <Picker.Item key={index} label={townName} value={townName} />
-            ))}
-          </Picker>
-        </View>
-        <View style={[styles.inputContainer, { height: 120, alignItems: "center", paddingTop: 8 }]}>
-        <Icon name="info" size={20} color="#7F8C8D" style={[styles.icon, { marginTop: -55 }]} />
-        <TextInput
-         style={[styles.input, { height: 100, textAlignVertical: "top", paddingTop: 8 }]}
-         placeholder="Briefly describe your business (max 100 words)"
-         value={description}
-         onChangeText={(text) => {
-         if (text.split(" ").length <= 50) {
-             setDescription(text);
-      }
-    }}
-    multiline
-  />
+
+        {/* Business Details Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Icon name="store" size={24} color="#1a237e" />
+            <Text style={styles.sectionTitle}>Business Information</Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Business Address *</Text>
+            <View style={styles.inputContainer}>
+              <Icon name="location-on" size={20} color="#1a237e" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your business address"
+                placeholderTextColor="#999"
+                value={businessAddress}
+                onChangeText={setBusinessAddress}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+  <Text style={styles.inputLabel}>Town/City *</Text>
+  <View style={styles.pickerContainer}>
+    <Icon name="location-city" size={20} color="#1a237e" style={styles.inputIcon} />
+    <Picker
+      selectedValue={town}
+      onValueChange={setTown}
+      style={styles.picker}
+      itemStyle={styles.pickerItem}           // ← new: better item styling
+      mode="dropdown"                         // ← ensures dropdown style on Android
+    >
+      <Picker.Item 
+        label="Select Your Town/City" 
+        value="" 
+        color="#999"                          // gray placeholder text
+      />
+      {namibianTowns.map((townName, index) => (
+        <Picker.Item 
+          key={index} 
+          label={townName} 
+          value={townName} 
+          color="#333"                        // darker text for list items
+        />
+      ))}
+    </Picker>
+  </View>
 </View>
 
-        <View style={styles.inputContainer}>
-          <Icon name="history" size={20} color="#7F8C8D" style={styles.icon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Years of Experience"
-            value={yearsOfExperience}
-            onChangeText={setYearsOfExperience}
-            keyboardType="numeric"
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Business Description</Text>
+            <View style={styles.textAreaContainer}>
+              <Icon name="description" size={20} color="#1a237e" style={styles.textAreaIcon} />
+              <TextInput
+                style={styles.textArea}
+                placeholder="Describe your business in 50 words or less"
+                placeholderTextColor="#999"
+                value={description}
+                onChangeText={(text) => {
+                  if (text.split(/\s+/).filter(Boolean).length <= 50) {
+                    setDescription(text);
+                  }
+                }}
+                multiline
+                maxLength={300}
+              />
+            </View>
+            <Text style={styles.charCount}>{wordCount}/50 words</Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Years of Experience *</Text>
+            <View style={styles.inputContainer}>
+              <Icon name="work-history" size={20} color="#1a237e" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="e.g., 5"
+                placeholderTextColor="#999"
+                value={yearsOfExperience}
+                onChangeText={setYearsOfExperience}
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* Services Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Icon name="design-services" size={24} color="#1a237e" />
+            <Text style={styles.sectionTitle}>Services Offered *</Text>
+          </View>
+          <ServicesSection101 onServicesChange={setServices} />
+        </View>
+
+        {/* Operating Hours Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Icon name="schedule" size={24} color="#1a237e" />
+            <Text style={styles.sectionTitle}>Operating Hours</Text>
+          </View>
+
+          {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => {
+            const isClosed = operatingHours[day]?.isClosed || false;
+
+            return (
+              <View key={day} style={styles.hoursCard}>
+                <View style={styles.hoursHeader}>
+                  <Text style={styles.dayText}>{day}</Text>
+                  <View style={styles.switchContainer}>
+                    <Text style={styles.switchLabel}>{isClosed ? "Closed" : "Open"}</Text>
+                    <Switch
+                      value={!isClosed}
+                      onValueChange={() => toggleDayClosed(day)}
+                      trackColor={{ false: "#e0e0e0", true: "#1a237e" }}
+                      thumbColor="#fff"
+                    />
+                  </View>
+                </View>
+
+                {!isClosed && (
+                  <View style={styles.timeSelectors}>
+                    <TouchableOpacity
+                      style={styles.timeButton}
+                      onPress={() => setTimePicker({ isVisible: true, day, field: "start" })}
+                    >
+                      <Icon name="access-time" size={18} color="#1a237e" />
+                      <Text style={styles.timeButtonText}>
+                        {operatingHours[day]?.start || "Start Time"}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <Icon name="arrow-forward" size={20} color="#999" />
+
+                    <TouchableOpacity
+                      style={styles.timeButton}
+                      onPress={() => setTimePicker({ isVisible: true, day, field: "end" })}
+                    >
+                      <Icon name="access-time" size={18} color="#1a237e" />
+                      <Text style={styles.timeButtonText}>
+                        {operatingHours[day]?.end || "End Time"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+
+          <ModalDateTimePicker
+            isVisible={timePicker.isVisible}
+            mode="time"
+            onConfirm={handleTimePickerConfirm}
+            onCancel={() => setTimePicker({ isVisible: false, day: "", field: "" })}
           />
         </View>
 
-    
-      <Text style={styles.sectionTitle}>Services Offered</Text>
-        <ServicesSection101 onServicesChange={setServices} />
-        <Text style={styles.sectionTitle}>Operating Hours</Text>
-        {[...Array(7)].map((_, i) => {
-          const day = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][i];
-          const isClosed = operatingHours[day]?.isClosed || false;
-
-          return (
-            <View key={day} style={styles.hoursRow}>
-              <Text style={styles.dayText}>{day}</Text>
-              <Switch
-                value={isClosed}
-                onValueChange={() => toggleDayClosed(day)}
-              />
-              {!isClosed ? (
-                <>
-                  <TouchableOpacity
-                    style={styles.timeButton}
-                    onPress={() => setTimePicker({ isVisible: true, day, field: "start" })}
-                  >
-                    <Text style={styles.timeButtonText}>
-                      {operatingHours[day]?.start || "Start Time"}
-                    </Text>
-                  </TouchableOpacity>
-                  <Text style={styles.toText}>to</Text>
-                  <TouchableOpacity
-                    style={styles.timeButton}
-                    onPress={() => setTimePicker({ isVisible: true, day, field: "end" })}
-                  >
-                    <Text style={styles.timeButtonText}>
-                      {operatingHours[day]?.end || "End Time"}
-                    </Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <Text style={styles.closedText}>Closed</Text>
-              )}
-            </View>
-          );
-        })}
-
-        <ModalDateTimePicker
-          isVisible={timePicker.isVisible}
-          mode="time"
-          onConfirm={handleTimePickerConfirm}
-          onCancel={() => setTimePicker({ isVisible: false, day: "", field: "" })}
-        />
-
-        <Text style={styles.sectionTitle}>Social Media Links</Text>
-        {["Website", "Facebook", "Instagram", "LinkedIn", "Twitter", "TikTok"].map((platform) => (
-          <View key={platform} style={styles.inputContainer}>
-            <Icon
-              name={platform === "Website" ? "web" : "link"}
-              size={20}
-              color="#7F8C8D"
-              style={styles.icon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder={`Enter your ${platform} link`}
-              value={socialLinks[platform.toLowerCase()]}
-              onChangeText={(text) =>
-                setSocialLinks((prev) => ({
-                  ...prev,
-                  [platform.toLowerCase()]: text,
-                }))
-              }
-            />
+        {/* Social Media Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Icon name="share" size={24} color="#1a237e" />
+            <Text style={styles.sectionTitle}>Social Media Links</Text>
           </View>
-        ))}
 
-        <Text style={styles.sectionTitle}>Upload Images</Text>
-        <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
-          <Text style={styles.uploadButtonText}>Pick Images</Text>
-        </TouchableOpacity>
-        <ScrollView horizontal>
-          {images.map((image, index) => (
-            <Image
-              key={index}
-              source={{ uri: image.uri }}
-              style={styles.imagePreview}
-            />
+          {[
+            { platform: "Website", icon: "language", key: "website" },
+            { platform: "Facebook", icon: "facebook", key: "facebook" },
+            { platform: "Instagram", icon: "camera-alt", key: "instagram" },
+            { platform: "LinkedIn", icon: "work", key: "linkedin" },
+            { platform: "Twitter", icon: "alternate-email", key: "twitter" },
+            { platform: "TikTok", icon: "music-note", key: "tiktok" },
+          ].map(({ platform, icon, key }) => (
+            <View key={key} style={styles.inputGroup}>
+              <View style={styles.inputContainer}>
+                <Icon name={icon} size={20} color="#1a237e" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder={`Enter your ${platform} link`}
+                  placeholderTextColor="#999"
+                  value={socialLinks[key]}
+                  onChangeText={(text) =>
+                    setSocialLinks((prev) => ({ ...prev, [key]: text }))
+                  }
+                />
+              </View>
+            </View>
           ))}
-        </ScrollView>
+        </View>
 
+        {/* Images Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Icon name="photo-library" size={24} color="#1a237e" />
+            <Text style={styles.sectionTitle}>Gallery Images</Text>
+          </View>
+
+          <View style={styles.imageCountBadge}>
+            <Icon name="image" size={18} color="#1a237e" />
+            <Text style={styles.imageCountText}>
+              {images.length}/10 images uploaded
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.uploadButton,
+              images.length >= 10 && styles.uploadButtonDisabled,
+            ]}
+            onPress={pickImage}
+            disabled={images.length >= 10}
+            activeOpacity={0.7}
+          >
+            <Icon
+              name="add-photo-alternate"
+              size={24}
+              color={images.length >= 10 ? "#999" : "#fff"}
+            />
+            <Text style={[
+              styles.uploadButtonText,
+              images.length >= 10 && styles.uploadButtonTextDisabled,
+            ]}>
+              {images.length >= 10 ? "Maximum Reached" : "Add Images"}
+            </Text>
+          </TouchableOpacity>
+
+          {images.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.imageGallery}
+            >
+              {images.map((image, index) => (
+                <View key={index} style={styles.imageWrapper}>
+                  <Image source={{ uri: image.uri }} style={styles.imagePreview} />
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={() => removeImage(index)}
+                    activeOpacity={0.7}
+                  >
+                    <Icon name="close" size={16} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+
+        {/* Submit Button */}
         <TouchableOpacity
           style={[
-          styles.button,
-          !isFormValid() && styles.disabledButton,
-          loading && { backgroundColor: "#9ea1c7", flexDirection: "row", justifyContent: "center", alignItems: "center" }
+            styles.submitButton,
+            (!isFormValid() || loading) && styles.submitButtonDisabled,
           ]}
-         onPress={handleSubmit}
-         disabled={!isFormValid() || loading}
->
-  {loading ? (
-    <>
-      <Icon name="autorenew" size={20} color="#fff" style={{ marginRight: 10 }} />
-      <Text style={styles.buttonText}>Submitting...</Text>
-    </>
-  ) : (
-    <Text style={styles.buttonText}>Complete Profile</Text>
-  )}
-</TouchableOpacity>
+          onPress={handleSubmit}
+          disabled={!isFormValid() || loading}
+          activeOpacity={0.8}
+        >
+          {loading ? (
+            <View style={styles.buttonContent}>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={styles.submitButtonText}>Creating Profile...</Text>
+            </View>
+          ) : (
+            <View style={styles.buttonContent}>
+              <Icon name="check-circle" size={22} color="#fff" />
+              <Text style={styles.submitButtonText}>Complete Profile</Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
+        {/* Security Notice */}
+        <View style={styles.securityNotice}>
+          <Icon name="verified-user" size={16} color="#4CAF50" />
+          <Text style={styles.securityText}>
+            Your information is securely encrypted and protected
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#f8f9ff',
+    backgroundColor: "#f8f9fc",
   },
   scrollContent: {
     flexGrow: 1,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
+    marginTop: 20,
+    marginBottom: 24,
+  },
+  iconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 20,
-    marginTop: 50,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#1a237e",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  iconInnerCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(26, 35, 126, 0.08)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1a237e',
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#1a237e",
+    marginBottom: 8,
+    textAlign: "center",
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: "#666",
+    textAlign: "center",
+    paddingHorizontal: 30,
+  },
+  progressSection: {
+    alignItems: "center",
+    marginBottom: 32,
+  },
+  progressSteps: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  progressStep: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#e0e0e0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  progressStepActive: {
+    backgroundColor: "#1a237e",
+  },
+  progressStepText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  progressStepTextInactive: {
+    color: "#999",
+  },
+  progressLine: {
+    width: 40,
+    height: 3,
+    backgroundColor: "#1a237e",
+    marginHorizontal: 8,
+  },
+  progressLineInactive: {
+    backgroundColor: "#e0e0e0",
+  },
+  progressLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1a237e",
+  },
+  section: {
+    marginBottom: 32,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+    gap: 12,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#1a237e',
-    marginTop: 20,
-    marginBottom: 10,
+    fontWeight: "700",
+    color: "#1a237e",
+    letterSpacing: -0.3,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1a237e",
+    marginBottom: 8,
+    letterSpacing: 0.2,
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
     borderRadius: 12,
-    borderColor: '#E0E0E0',
     borderWidth: 1,
-    marginBottom: 16,
+    borderColor: "#e0e0e0",
     paddingHorizontal: 16,
     height: 56,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
   },
-  icon: {
+  inputIcon: {
     marginRight: 12,
-    color: '#1a237e',
   },
   input: {
     flex: 1,
-    fontSize: 16,
-    color: '#333',
+    fontSize: 15,
+    color: "#333",
   },
-  dropdownContainer: {
-    backgroundColor: '#FFFFFF',
+  pickerContainer: {
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: "#fff",
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: "#e0e0e0",
+  paddingLeft: 16,
+  height: Platform.OS === "ios" ? 100 : 60,  // ← much taller on iOS (wheel needs space)
+  overflow: "hidden",
+  ...Platform.select({
+    ios: {
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+    },
+    android: {
+      elevation: 1,
+    },
+  }),
+},
+
+picker: {
+  flex: 1,
+  height: Platform.OS === "ios" ? 180 : 60,   // ← matches container height
+  width: "100%",
+  color: "#333",
+  fontSize: 16,
+},
+
+pickerItem: {
+  fontSize: 16,                              // larger, clearer text in dropdown
+  color: "#333",
+  fontWeight: "500",
+  backgroundColor: "#fff",   
+  marginTop: -20,                // clean white background
+},
+  textAreaContainer: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
     borderRadius: 12,
-    borderColor: '#E0E0E0',
     borderWidth: 1,
-    marginBottom: 16,
-    paddingHorizontal: 10,
-    height: 56,
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    borderColor: "#e0e0e0",
+    padding: 16,
+    minHeight: 120,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
   },
-  hoursRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
+  textAreaIcon: {
+    marginRight: 12,
+    alignSelf: "flex-start",
+    marginTop: 2,
+  },
+  textArea: {
+    flex: 1,
+    fontSize: 15,
+    color: "#333",
+    textAlignVertical: "top",
+    minHeight: 100,
+  },
+  charCount: {
+    fontSize: 12,
+    color: "#999",
+    textAlign: "right",
+    marginTop: 6,
+  },
+  hoursCard: {
+    backgroundColor: "#fff",
     borderRadius: 12,
-    borderColor: '#E0E0E0',
     borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    borderColor: "#e0e0e0",
+    padding: 16,
+    marginBottom: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
+  },
+  hoursHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
   },
   dayText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    flex: 1,
+    fontWeight: "600",
+    color: "#1a237e",
+  },
+  switchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  switchLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#666",
+  },
+  timeSelectors: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
   },
   timeButton: {
-    backgroundColor: '#f8f9ff',
-    padding: 10,
-    borderRadius: 8,
-    borderColor: '#E0E0E0',
-    borderWidth: 1,
-    alignItems: 'center',
     flex: 1,
-    marginHorizontal: 5,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fafbff",
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    gap: 8,
   },
   timeButtonText: {
     fontSize: 14,
-    color: '#333',
-    fontWeight: '500',
+    fontWeight: "500",
+    color: "#1a237e",
   },
-  toText: {
-    fontSize: 16,
-    color: '#666',
-    marginHorizontal: 5,
-  },
-  closedText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#E53935',
-    marginLeft: 10,
-  },
-  button: {
-    backgroundColor: '#1a237e',
-    padding: 16,
+  imageCountBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(26, 35, 126, 0.08)",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 12,
-    width: '100%',
-    alignItems: 'center',
-    marginTop: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  disabledButton: {
-    backgroundColor: '#9fa8da',
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  servicesDropdown: {
-    maxHeight: 200,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderColor: '#E0E0E0',
-    borderWidth: 1,
+    alignSelf: "flex-start",
     marginBottom: 16,
-    padding: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    gap: 8,
+  },
+  imageCountText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1a237e",
   },
   uploadButton: {
-    backgroundColor: '#1a237e',
-    padding: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginVertical: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#1a237e",
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 10,
+    marginBottom: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#1a237e",
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  uploadButtonDisabled: {
+    backgroundColor: "#e0e0e0",
+    ...Platform.select({
+      ios: {
+        shadowOpacity: 0,
+      },
+      android: {
+        elevation: 0,
+      },
+    }),
   },
   uploadButtonText: {
-    color: '#FFFFFF',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+  uploadButtonTextDisabled: {
+    color: "#999",
+  },
+  imageGallery: {
+    marginTop: 8,
+  },
+  imageWrapper: {
+    position: "relative",
+    marginRight: 12,
   },
   imagePreview: {
     width: 100,
     height: 100,
-    borderRadius: 8,
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  }
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#1a237e",
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#f44336",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  submitButton: {
+    backgroundColor: "#1a237e",
+    paddingVertical: 18,
+    borderRadius: 14,
+    marginTop: 8,
+    marginBottom: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#1a237e",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+  },
+  submitButtonDisabled: {
+    backgroundColor: "#bdbdbd",
+    ...Platform.select({
+      ios: {
+        shadowOpacity: 0,
+      },
+      android: {
+        elevation: 0,
+      },
+    }),
+  },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  submitButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  securityNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+  },
+  securityText: {
+    fontSize: 12,
+    color: "#666",
+    fontStyle: "italic",
+  },
 });
 
 export default CompleteProfileScreen;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Fragment } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import axios from "axios";
 import { Picker } from "@react-native-picker/picker";
@@ -21,7 +22,7 @@ const ServicesSection101 = ({ onServicesChange }) => {
   const [errors, setErrors] = useState({});
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("predefined"); // "predefined" or "custom"
+  const [activeTab, setActiveTab] = useState("predefined");
 
   useEffect(() => {
     fetchData();
@@ -35,36 +36,33 @@ const ServicesSection101 = ({ onServicesChange }) => {
         axios.get("https://service-booking-backend-eb9i.onrender.com/api/auth/categories"),
       ]);
 
-      if (servicesRes.data?.success) {
-        setAvailableServices(servicesRes.data.services);
-      }
-      if (categoriesRes.data?.success) {
-        setAvailableCategories(categoriesRes.data.categories);
-      }
+      if (servicesRes.data?.success) setAvailableServices(servicesRes.data.services);
+      if (categoriesRes.data?.success) setAvailableCategories(categoriesRes.data.categories);
     } catch (error) {
-      Alert.alert("Error", "Failed to load services or categories. Please try again later.");
+      Alert.alert("Error", "Failed to load services/categories.");
     } finally {
       setIsLoading(false);
     }
   };
 
   const validateService = (service) => {
-    const errors = {};
-    if (!service.name) errors.name = "Service name is required";
-    if (!service.price) errors.price = "Price is required";
-    if (!service.priceType) errors.priceType = "Price type is required";
-    if (!service.description) errors.description = "Description is required";
-    return errors;
+    const errs = {};
+    if (!service.name?.trim()) errs.name = "Required";
+    if (!service.price?.trim()) errs.price = "Required";
+    if (!service.priceType) errs.priceType = "Required";
+    if (service.isCustom && !service.description?.trim()) errs.description = "Required";
+    return errs;
   };
 
   const handleAddPredefinedService = (service) => {
-    if (selectedServices.find((s) => s.name === service.name)) {
-      Alert.alert("Service Already Added", "This service is already in your list.");
+    if (selectedServices.some((s) => s.name === service.name)) {
+      Alert.alert("Already added", "This service is already in your list.");
       return;
     }
-    const newService = { ...service, price: "", priceType: "" };
-    setSelectedServices([...selectedServices, newService]);
-    onServicesChange([...selectedServices, ...customServices, newService]);
+    const newService = { ...service, price: "", priceType: "", description: "" };
+    const updated = [...selectedServices, newService];
+    setSelectedServices(updated);
+    onServicesChange([...updated, ...customServices]);
     setIsSaved(false);
   };
 
@@ -77,94 +75,114 @@ const ServicesSection101 = ({ onServicesChange }) => {
       description: "",
       isCustom: true,
     };
-    setCustomServices([...customServices, newService]);
-    onServicesChange([...selectedServices, ...customServices, newService]);
+    const updated = [...customServices, newService];
+    setCustomServices(updated);
+    onServicesChange([...selectedServices, ...updated]);
     setIsSaved(false);
   };
 
   const handleUpdateService = (index, key, value, isCustom = false) => {
-    const services = isCustom ? [...customServices] : [...selectedServices];
-    services[index] = { ...services[index], [key]: value };
+    const list = isCustom ? [...customServices] : [...selectedServices];
+    list[index] = { ...list[index], [key]: value };
 
-    if (isCustom) {
-      setCustomServices(services);
-    } else {
-      setSelectedServices(services);
-    }
+    if (isCustom) setCustomServices(list);
+    else setSelectedServices(list);
 
     onServicesChange([...selectedServices, ...customServices]);
 
+    const serviceErrors = validateService(list[index]);
     setErrors((prev) => ({
       ...prev,
-      [`${isCustom ? "custom" : "predefined"}_${index}`]: undefined,
+      [`${isCustom ? "custom" : "predefined"}_${index}`]: Object.keys(serviceErrors).length ? serviceErrors : undefined,
     }));
-    
-    const serviceErrors = validateService(services[index]);
-    if (Object.keys(serviceErrors).length > 0) {
-      setErrors((prev) => ({
-        ...prev,
-        [`${isCustom ? "custom" : "predefined"}_${index}`]: serviceErrors,
-      }));
-    }
 
     setIsSaved(false);
   };
 
   const handleRemoveService = (index, isCustom = false) => {
     if (isCustom) {
-      const updatedServices = [...customServices];
-      updatedServices.splice(index, 1);
-      setCustomServices(updatedServices);
-      onServicesChange([...selectedServices, ...updatedServices]);
+      const updated = customServices.filter((_, i) => i !== index);
+      setCustomServices(updated);
+      onServicesChange([...selectedServices, ...updated]);
     } else {
-      const updatedServices = [...selectedServices];
-      updatedServices.splice(index, 1);
-      setSelectedServices(updatedServices);
-      onServicesChange([...updatedServices, ...customServices]);
+      const updated = selectedServices.filter((_, i) => i !== index);
+      setSelectedServices(updated);
+      onServicesChange([...updated, ...customServices]);
     }
     setIsSaved(false);
   };
 
-  const handleSubmit = () => {
-    let isValid = true;
+  const handleSave = () => {
     const allServices = [...selectedServices, ...customServices];
     const newErrors = {};
 
-    allServices.forEach((service, index) => {
-      const serviceErrors = validateService(service);
-      if (Object.keys(serviceErrors).length > 0) {
-        isValid = false;
-        const key = service.isCustom ? `custom_${index}` : `predefined_${index}`;
-        newErrors[key] = serviceErrors;
+    allServices.forEach((s, i) => {
+      const errs = validateService(s);
+      if (Object.keys(errs).length) {
+        newErrors[`${s.isCustom ? "custom" : "predefined"}_${i}`] = errs;
       }
     });
 
     setErrors(newErrors);
 
-    if (!isValid) {
-      Alert.alert(
-        "Missing Information",
-        "Please fill in all required fields for each service."
-      );
+    if (Object.keys(newErrors).length > 0) {
+      Alert.alert("Incomplete", "Please fill in all required fields.");
       return;
     }
 
     if (allServices.length === 0) {
-      Alert.alert(
-        "No Services Added",
-        "Please add at least one service before saving."
-      );
+      Alert.alert("No services", "Add at least one service.");
       return;
     }
 
     setIsSaved(true);
     onServicesChange(allServices);
-    Alert.alert("Success", "Your services have been saved successfully!");
+    Alert.alert("Saved", "Services updated successfully.");
+  };
+
+  const PriceTypeSelector = ({ value, onChange, error }) => {
+    const options = [
+      { label: "Per Hour", value: "hourly" },
+      { label: "Per Job", value: "once-off" },
+    ];
+
+    return (
+      <View>
+        <Text style={styles.fieldLabel}>Pricing Type *</Text>
+        <View style={[styles.priceTypeContainer, error && styles.priceTypeContainerError]}>
+          {options.map((opt, index) => (
+            <Fragment key={opt.value}>
+              {index > 0 && <View style={styles.divider} />}
+              <TouchableOpacity
+                style={[
+                  styles.priceTypeButton,
+                  value === opt.value && styles.priceTypeButtonActive,
+                  index === 0 && styles.firstButton,
+                  index === options.length - 1 && styles.lastButton,
+                ]}
+                onPress={() => onChange(opt.value)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.priceTypeButtonText,
+                    value === opt.value && styles.priceTypeButtonTextActive,
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            </Fragment>
+          ))}
+        </View>
+        {error && <Text style={styles.fieldError}>Please select pricing type</Text>}
+      </View>
+    );
   };
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.centered}>
         <ActivityIndicator size="large" color="#1a237e" />
         <Text style={styles.loadingText}>Loading services...</Text>
       </View>
@@ -172,184 +190,104 @@ const ServicesSection101 = ({ onServicesChange }) => {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.section}>
+    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+      <View style={styles.contentPadding}>
         {/* Header */}
         <View style={styles.header}>
-          <MaterialIcons name="business-center" size={30} color="#1a237e" />
-          <Text style={styles.headerTitle}>Your Services</Text>
-        </View>
-        
-        {/* Quick Guide */}
-        <View style={styles.guideCard}>
-          <Text style={styles.guideTitle}>
-            <MaterialIcons name="info-outline" size={18} color="#1a237e" /> Quick Guide
-          </Text>
-          <Text style={styles.guideText}>
-            1. Select services from our list or create your own
-          </Text>
-          <Text style={styles.guideText}>
-            2. Set your price and pricing model for each service
-          </Text>
-          <Text style={styles.guideText}>
-            3. Save your changes when you're done
-          </Text>
+          <MaterialIcons name="business-center" size={28} color="#1a237e" />
+          <Text style={styles.headerTitle}>Services</Text>
         </View>
 
-        {/* Tab Navigation */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === "predefined" && styles.activeTab]}
+        {/* Tabs */}
+        <View style={styles.tabBar}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "predefined" && styles.tabActive]}
             onPress={() => setActiveTab("predefined")}
           >
-            <MaterialIcons 
-              name="list" 
-              size={20} 
-              color={activeTab === "predefined" ? "#1a237e" : "#78909c"} 
-            />
-            <Text style={[styles.tabText, activeTab === "predefined" && styles.activeTabText]}>
-              Predefined Services
+            <Text style={[styles.tabText, activeTab === "predefined" && styles.tabTextActive]}>
+              Predefined
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === "custom" && styles.activeTab]}
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "custom" && styles.tabActive]}
             onPress={() => setActiveTab("custom")}
           >
-            <MaterialIcons 
-              name="add-circle-outline" 
-              size={20} 
-              color={activeTab === "custom" ? "#1a237e" : "#78909c"} 
-            />
-            <Text style={[styles.tabText, activeTab === "custom" && styles.activeTabText]}>
-              Custom Services
+            <Text style={[styles.tabText, activeTab === "custom" && styles.tabTextActive]}>
+              Custom
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Predefined Services Tab */}
+        {/* Predefined tab */}
         {activeTab === "predefined" && (
           <View style={styles.card}>
-            <View style={styles.stepIndicator}>
-              <View style={styles.stepCircle}>
-                <Text style={styles.stepNumber}>1</Text>
-              </View>
-              <Text style={styles.stepText}>Select a service from our list</Text>
-            </View>
-            
-            <View style={styles.selectContainer}>
+            <Text style={styles.sectionHelpText}>Choose from our list of common services</Text>
+
+            <View style={styles.pickerWrapper}>
               <Picker
-                style={styles.picker}
-                onValueChange={(value) => {
-                  if (value) {
-                    const service = availableServices.find((s) => s.name === value);
-                    handleAddPredefinedService(service);
-                  }
+                selectedValue=""
+                onValueChange={(val) => {
+                  if (!val) return;
+                  const service = availableServices.find((s) => s.name === val);
+                  if (service) handleAddPredefinedService(service);
                 }}
+                style={styles.picker}
               >
-                <Picker.Item label="↓ Tap here to select a service ↓" value="" />
-                {availableServices.map((service, index) => (
-                  <Picker.Item
-                    key={index}
-                    label={`${service.name} (${service.category})`}
-                    value={service.name}
-                  />
+                <Picker.Item label="Select a service..." value="" color="#757575" />
+                {availableServices.map((s) => (
+                  <Picker.Item key={s.name} label={`${s.name} (${s.category})`} value={s.name} />
                 ))}
               </Picker>
             </View>
 
             {selectedServices.length === 0 ? (
-              <View style={styles.emptyState}>
-                <MaterialIcons name="playlist-add" size={40} color="#b0bec5" />
-                <Text style={styles.emptyStateText}>
-                  No services added yet
-                </Text>
-                <Text style={styles.emptyStateSubtext}>
-                  Use the dropdown above to add services
-                </Text>
+              <View style={styles.empty}>
+                <MaterialIcons name="playlist-add" size={48} color="#cfd8dc" />
+                <Text style={styles.emptyText}>No services added yet</Text>
               </View>
             ) : (
               <>
-                <View style={styles.stepIndicator}>
-                  <View style={styles.stepCircle}>
-                    <Text style={styles.stepNumber}>2</Text>
-                  </View>
-                  <Text style={styles.stepText}>Set price for each service</Text>
-                </View>
-                
-                <Text style={styles.serviceCountText}>
-                  {selectedServices.length} service{selectedServices.length !== 1 ? 's' : ''} added
-                </Text>
-                
-                {selectedServices.map((service, index) => (
-                  <View key={index} style={styles.serviceCard}>
-                    <View style={styles.serviceCardHeader}>
-                      <Text style={styles.serviceName}>{service.name}</Text>
-                      <TouchableOpacity
-                        onPress={() => handleRemoveService(index)}
-                        style={styles.removeButton}
-                      >
-                        <MaterialIcons name="delete-outline" size={24} color="#E53935" />
+                <Text style={styles.countText}>{selectedServices.length} added</Text>
+
+                {selectedServices.map((service, idx) => (
+                  <View key={idx} style={styles.serviceItem}>
+                    <View style={styles.serviceHeader}>
+                      <View>
+                        <Text style={styles.serviceTitle}>{service.name}</Text>
+                        <Text style={styles.serviceMeta}>{service.category}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => handleRemoveService(idx)}>
+                        <MaterialIcons name="close" size={24} color="#78909c" />
                       </TouchableOpacity>
                     </View>
-                    
-                    <Text style={styles.serviceCategory}>
-                      <MaterialIcons name="category" size={14} color="#546e7a" /> {service.category}
-                    </Text>
-                    
-                    <View style={styles.inputRow}>
-                      <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>
-                          <MaterialIcons name="attach-money" size={14} color="#546e7a" /> Price*
-                        </Text>
-                        <TextInput
-                          style={[
-                            styles.input,
-                            errors[`predefined_${index}`]?.price && styles.inputError,
-                          ]}
-                          placeholder="Enter price"
-                          value={service.price}
-                          onChangeText={(value) =>
-                            handleUpdateService(index, "price", value)
-                          }
-                          keyboardType="numeric"
-                        />
-                        {errors[`predefined_${index}`]?.price && (
-                          <Text style={styles.errorText}>
-                            {errors[`predefined_${index}`].price}
-                          </Text>
-                        )}
+
+                    <View style={styles.formSection}>
+                      <View style={styles.priceRow}>
+                        <View style={styles.priceInputGroup}>
+                          <Text style={styles.fieldLabel}>Price (N$) *</Text>
+                          <TextInput
+                            style={[styles.input, errors[`predefined_${idx}`]?.price && styles.inputError]}
+                            placeholder="0.00"
+                            value={service.price}
+                            onChangeText={(v) => handleUpdateService(idx, "price", v)}
+                            keyboardType="numeric"
+                          />
+                        </View>
+
+                        <View style={styles.priceTypeGroup}>
+                          <PriceTypeSelector
+                            value={service.priceType}
+                            onChange={(v) => handleUpdateService(idx, "priceType", v)}
+                            error={!!errors[`predefined_${idx}`]?.priceType}
+                          />
+                        </View>
                       </View>
 
-                      <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>
-                          <MaterialIcons name="schedule" size={14} color="#546e7a" /> Pricing*
+                      {errors[`predefined_${idx}`] && (
+                        <Text style={styles.formError}>
+                          {Object.values(errors[`predefined_${idx}`])[0]}
                         </Text>
-                        <Picker
-                          selectedValue={service.priceType}
-                          style={[
-                            styles.picker,
-                            styles.smallPicker,
-                            { fontSize: 16, color: "#000", backgroundColor: "#fff" },
-                            errors[`predefined_${index}`]?.priceType && styles.pickerError,
-                          ]}
-                          itemStyle={{ fontSize: 16, color: "#000" }}
-                          dropdownIconColor="#1a237e"
-                          mode="dropdown"
-                          onValueChange={(value) =>
-                            handleUpdateService(index, "priceType", value)
-                          }
-                        >
-                          <Picker.Item label="Select Pricing Type" value="" color="#757575" />
-                          <Picker.Item label="Per Hour" value="hourly" color="#000" />
-                          <Picker.Item label="Fixed Price" value="once-off" color="#000" />
-                        </Picker>
-
-                        {errors[`predefined_${index}`]?.priceType && (
-                          <Text style={styles.errorText}>
-                            {errors[`predefined_${index}`].priceType}
-                          </Text>
-                        )}
-                      </View>
+                      )}
                     </View>
                   </View>
                 ))}
@@ -358,161 +296,97 @@ const ServicesSection101 = ({ onServicesChange }) => {
           </View>
         )}
 
-        {/* Custom Services Tab */}
+        {/* Custom tab */}
         {activeTab === "custom" && (
           <View style={styles.card}>
-            <View style={styles.stepIndicator}>
-              <View style={styles.stepCircle}>
-                <Text style={styles.stepNumber}>1</Text>
-              </View>
-              <Text style={styles.stepText}>Select a category for your custom service</Text>
-            </View>
-            
-            <View style={styles.selectContainer}>
+            <Text style={styles.sectionHelpText}>Create your own service</Text>
+
+            <View style={styles.pickerWrapper}>
               <Picker
+                selectedValue=""
+                onValueChange={(val) => val && handleAddCustomService(val)}
                 style={styles.picker}
-                onValueChange={(value) => {
-                  if (value) handleAddCustomService(value);
-                }}
               >
-                <Picker.Item label="↓ Tap here to select a category ↓" value="" />
-                {availableCategories.map((category, index) => (
-                  <Picker.Item key={index} label={category} value={category} />
+                <Picker.Item label="Choose category..." value="" color="#757575" />
+                {availableCategories.map((cat) => (
+                  <Picker.Item key={cat} label={cat} value={cat} />
                 ))}
               </Picker>
             </View>
 
             {customServices.length === 0 ? (
-              <View style={styles.emptyState}>
-                <MaterialIcons name="add-box" size={40} color="#b0bec5" />
-                <Text style={styles.emptyStateText}>
-                  No custom services added yet
-                </Text>
-                <Text style={styles.emptyStateSubtext}>
-                  Select a category above to create your own service
-                </Text>
+              <View style={styles.empty}>
+                <MaterialIcons name="add-circle-outline" size={48} color="#cfd8dc" />
+                <Text style={styles.emptyText}>No custom services yet</Text>
               </View>
             ) : (
               <>
-                <View style={styles.stepIndicator}>
-                  <View style={styles.stepCircle}>
-                    <Text style={styles.stepNumber}>2</Text>
-                  </View>
-                  <Text style={styles.stepText}>Add details for each custom service</Text>
-                </View>
-                
-                <Text style={styles.serviceCountText}>
-                  {customServices.length} custom service{customServices.length !== 1 ? 's' : ''} added
-                </Text>
-                
-                {customServices.map((service, index) => (
-                  <View key={index} style={styles.serviceCard}>
-                    <View style={styles.serviceCardHeader}>
-                      <Text style={styles.categoryBadge}>{service.category}</Text>
-                      <TouchableOpacity
-                        onPress={() => handleRemoveService(index, true)}
-                        style={styles.removeButton}
-                      >
-                        <MaterialIcons name="delete-outline" size={24} color="#E53935" />
+                <Text style={styles.countText}>{customServices.length} added</Text>
+
+                {customServices.map((service, idx) => (
+                  <View key={idx} style={styles.serviceItem}>
+                    <View style={styles.serviceHeader}>
+                      <View style={styles.categoryTag}>
+                        <Text style={styles.categoryTagText}>{service.category}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => handleRemoveService(idx, true)}>
+                        <MaterialIcons name="close" size={24} color="#78909c" />
                       </TouchableOpacity>
                     </View>
-                    
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>
-                        <MaterialIcons name="label" size={14} color="#546e7a" /> Service Name*
-                      </Text>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          errors[`custom_${index}`]?.name && styles.inputError,
-                        ]}
-                        placeholder="What's your service called?"
-                        value={service.name}
-                        onChangeText={(value) =>
-                          handleUpdateService(index, "name", value, true)
-                        }
-                      />
-                      {errors[`custom_${index}`]?.name && (
-                        <Text style={styles.errorText}>
-                          {errors[`custom_${index}`].name}
-                        </Text>
-                      )}
-                    </View>
 
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>
-                        <MaterialIcons name="description" size={14} color="#546e7a" /> Description*
-                      </Text>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          styles.textArea,
-                          errors[`custom_${index}`]?.description && styles.inputError,
-                        ]}
-                        placeholder="Describe what this service includes"
-                        value={service.description}
-                        onChangeText={(value) =>
-                          handleUpdateService(index, "description", value, true)
-                        }
-                        multiline
-                        numberOfLines={3}
-                      />
-                      {errors[`custom_${index}`]?.description && (
-                        <Text style={styles.errorText}>
-                          {errors[`custom_${index}`].description}
-                        </Text>
-                      )}
-                    </View>
-
-                    <View style={styles.inputRow}>
+                    <View style={styles.formSection}>
                       <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>
-                          <MaterialIcons name="attach-money" size={14} color="#546e7a" /> Price*
-                        </Text>
+                        <Text style={styles.fieldLabel}>Service Name *</Text>
+                        <TextInput
+                          style={[styles.input, errors[`custom_${idx}`]?.name && styles.inputError]}
+                          placeholder="e.g. Deep Cleaning – 3 Bedrooms"
+                          value={service.name}
+                          onChangeText={(v) => handleUpdateService(idx, "name", v, true)}
+                        />
+                      </View>
+
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.fieldLabel}>Description</Text>
                         <TextInput
                           style={[
                             styles.input,
-                            errors[`custom_${index}`]?.price && styles.inputError,
+                            styles.textArea,
+                            errors[`custom_${idx}`]?.description && styles.inputError,
                           ]}
-                          placeholder="Enter price"
-                          value={service.price}
-                          onChangeText={(value) =>
-                            handleUpdateService(index, "price", value, true)
-                          }
-                          keyboardType="numeric"
+                          placeholder="What does this service include?..."
+                          value={service.description}
+                          onChangeText={(v) => handleUpdateService(idx, "description", v, true)}
+                          multiline
+                          numberOfLines={4}
                         />
-                        {errors[`custom_${index}`]?.price && (
-                          <Text style={styles.errorText}>
-                            {errors[`custom_${index}`].price}
-                          </Text>
-                        )}
                       </View>
 
-                      <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>
-                          <MaterialIcons name="schedule" size={14} color="#546e7a" /> Pricing*
-                        </Text>
-                        <Picker
-                          selectedValue={service.priceType}
-                          style={[
-                            styles.picker,
-                            styles.smallPicker,
-                            errors[`custom_${index}`]?.priceType && styles.pickerError,
-                          ]}
-                          onValueChange={(value) =>
-                            handleUpdateService(index, "priceType", value, true)
-                          }
-                        >
-                          <Picker.Item label="Select" value="" />
-                          <Picker.Item label="Per Hour" value="hourly" />
-                          <Picker.Item label="Fixed Price" value="once-off" />
-                        </Picker>
-                        {errors[`custom_${index}`]?.priceType && (
-                          <Text style={styles.errorText}>
-                            {errors[`custom_${index}`].priceType}
-                          </Text>
-                        )}
+                      <View style={styles.priceRow}>
+                        <View style={styles.priceInputGroup}>
+                          <Text style={styles.fieldLabel}>Price (N$) *</Text>
+                          <TextInput
+                            style={[styles.input, errors[`custom_${idx}`]?.price && styles.inputError]}
+                            placeholder="0.00"
+                            value={service.price}
+                            onChangeText={(v) => handleUpdateService(idx, "price", v, true)}
+                            keyboardType="numeric"
+                          />
+                        </View>
+
+                        <View style={styles.priceTypeGroup}>
+                          <PriceTypeSelector
+                            value={service.priceType}
+                            onChange={(v) => handleUpdateService(idx, "priceType", v, true)}
+                            error={!!errors[`custom_${idx}`]?.priceType}
+                          />
+                        </View>
                       </View>
+
+                      {errors[`custom_${idx}`] && (
+                        <Text style={styles.formError}>
+                          {Object.values(errors[`custom_${idx}`])[0]}
+                        </Text>
+                      )}
                     </View>
                   </View>
                 ))}
@@ -521,318 +395,297 @@ const ServicesSection101 = ({ onServicesChange }) => {
           </View>
         )}
 
-        {/* Summary and Save Button */}
-        <View style={styles.summaryBar}>
-          <View style={styles.summaryInfo}>
-            <Text style={styles.summaryText}>
-              <MaterialIcons name="check-circle" size={16} color="#1a237e" /> {selectedServices.length + customServices.length} total services
-            </Text>
-          </View>
+        {/* Save bar */}
+        <View style={styles.saveContainer}>
+          <Text style={styles.totalCount}>
+            {selectedServices.length + customServices.length} service
+            {(selectedServices.length + customServices.length) !== 1 ? "s" : ""}
+          </Text>
+
           <TouchableOpacity
-            style={[styles.saveButton, isSaved && styles.savedButton]}
-            onPress={handleSubmit}
+            style={[styles.saveBtn, isSaved && styles.saveBtnSaved]}
+            onPress={handleSave}
             disabled={isSaved}
           >
             <MaterialIcons name={isSaved ? "check" : "save"} size={20} color="#fff" />
-            <Text style={styles.saveButtonText}>
-              {isSaved ? "Saved!" : "Save All"}
-            </Text>
+            <Text style={styles.saveBtnText}>{isSaved ? "Saved" : "Save Services"}</Text>
           </TouchableOpacity>
         </View>
       </View>
     </ScrollView>
   );
 };
-  
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f7fa',
+    backgroundColor: "#f8f9fc",
   },
-  loadingContainer: {
+  contentPadding: {
+    padding: 16,
+  },
+  centered: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   loadingText: {
     marginTop: 16,
+    color: "#1a237e",
     fontSize: 16,
-    color: '#1a237e',
-  },
-  section: {
-    padding: 20,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 24,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1a237e',
-    marginLeft: 12,
+    fontSize: 26,
+    fontWeight: "700",
+    color: "#1a237e",
+    marginLeft: 10,
   },
-  guideCard: {
-    backgroundColor: '#e8eaf6',
+  tabBar: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 28,
-    borderLeftWidth: 4,
-    borderLeftColor: '#1a237e',
-  },
-  guideTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#1a237e',
-    marginBottom: 12,
-  },
-  guideText: {
-    fontSize: 15,
-    color: '#37474f',
-    marginBottom: 8,
-    lineHeight: 22,
-  },
-  tabContainer: {
-    flexDirection: 'row',
+    overflow: "hidden",
     marginBottom: 24,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#fff',
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
   },
   tab: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: 14,
-    backgroundColor: '#fff',
+    alignItems: "center",
+    backgroundColor: "#fff",
   },
-  activeTab: {
-    backgroundColor: '#e8eaf6',
-    borderBottomWidth: 3,
-    borderBottomColor: '#1a237e',
+  tabActive: {
+    backgroundColor: "#e8eaf6",
   },
   tabText: {
     fontSize: 15,
-    fontWeight: '500',
-    color: '#78909c',
-    marginLeft: 8,
+    fontWeight: "500",
+    color: "#607d8b",
   },
-  activeTabText: {
-    color: '#1a237e',
-    fontWeight: '600',
+  tabTextActive: {
+    color: "#1a237e",
+    fontWeight: "600",
   },
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 20,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
     marginBottom: 24,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 5,
+    shadowRadius: 6,
   },
-  stepIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  sectionHelpText: {
+    fontSize: 15,
+    color: "#546e7a",
     marginBottom: 16,
   },
-  stepCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#1a237e',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  stepNumber: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  stepText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#37474f',
-  },
-  selectContainer: {
+  pickerWrapper: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    marginBottom: 20,
-    marginTop: 8,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 30,
-    backgroundColor: '#f9fafc',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderStyle: 'dashed',
-    marginTop: 10,
-  },
-  emptyStateText: {
-    fontSize: 17,
-    fontWeight: '500',
-    color: '#78909c',
-    marginTop: 12,
-  },
-  emptyStateSubtext: {
-    fontSize: 15,
-    color: '#90a4ae',
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  serviceCountText: {
-    fontSize: 15,
-    color: '#546e7a',
-    marginBottom: 16,
-    marginTop: 8,
-    fontWeight: '500',
-  },
-  serviceCard: {
-    backgroundColor: '#f9fafc',
+    borderColor: "#e0e0e0",
     borderRadius: 12,
+    backgroundColor: "#fff",
+    marginBottom: 20,
+    overflow: "hidden",
+  },
+  picker: {
+    height: Platform.OS === "ios" ? 140 : 52,
+    width: "100%",
+  },
+  empty: {
+    alignItems: "center",
+    paddingVertical: 48,
+  },
+  emptyText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: "#78909c",
+    fontWeight: "500",
+  },
+  countText: {
+    fontSize: 15,
+    color: "#455a64",
+    marginVertical: 16,
+    fontWeight: "500",
+  },
+  serviceItem: {
+    backgroundColor: "#fafcff",
+    borderRadius: 14,
     padding: 18,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: "#e3e8ef",
   },
-  serviceCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
+  serviceHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 20,
   },
-  serviceName: {
+  serviceTitle: {
     fontSize: 17,
-    fontWeight: '600',
-    color: '#263238',
-    flex: 1,
+    fontWeight: "600",
+    color: "#263238",
   },
-  categoryBadge: {
-    backgroundColor: '#e3f2fd',
+  serviceMeta: {
+    fontSize: 13,
+    color: "#78909c",
+    marginTop: 4,
+  },
+  categoryTag: {
+    backgroundColor: "#e3f2fd",
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1565c0',
+    borderRadius: 8,
+    alignSelf: "flex-start",
   },
-  serviceCategory: {
-    fontSize: 14,
-    color: '#546e7a',
-    marginBottom: 16,
+  categoryTagText: {
+    color: "#1565c0",
+    fontSize: 13,
+    fontWeight: "500",
   },
-  removeButton: {
-    padding: 8,
-    marginRight: -5,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  formSection: {
     marginTop: 8,
   },
   inputGroup: {
-    marginBottom: 16,
-    flex: 1,
-    marginHorizontal: 5,
+    marginBottom: 24,
   },
-  inputLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#546e7a',
+  priceRow: {
+    flexDirection: "row",
+    gap: 16,
+    marginTop: 8,
+  },
+  priceInputGroup: {
+    flex: 1,
+  },
+  priceTypeGroup: {
+    flex: 1.15,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#455a64",
     marginBottom: 8,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
-  },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
-    paddingTop: 12,
-    lineHeight: 22,
-  },
-  inputError: {
-    borderColor: '#E53935',
-    backgroundColor: '#ffebee',
-  },
-  picker: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    height: 50,
-  },
-  smallPicker: {
-    height: 48,
-  },
-  pickerError: {
-    borderColor: '#E53935',
-    backgroundColor: '#ffebee',
-  },
-  errorText: {
-    color: '#E53935',
+  fieldError: {
+    color: "#d32f2f",
     fontSize: 13,
     marginTop: 6,
   },
-  summaryBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+  input: {
+    borderWidth: 1,
+    borderColor: "#d0d7dd",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    fontSize: 16,
+    backgroundColor: "#fff",
+  },
+  textArea: {
+    minHeight: 110,
+    textAlignVertical: "top",
+    paddingTop: 14,
+  },
+  inputError: {
+    borderColor: "#ef5350",
+    backgroundColor: "#fff5f5",
+  },
+  priceTypeContainer: {
+    flexDirection: "row",
+    borderWidth: 1,
+    borderColor: "#d0d7dd",
     borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#f8f9fa",
+  },
+  priceTypeContainerError: {
+    borderColor: "#ef5350",
+  },
+  priceTypeButton: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ffffff",
+  },
+  firstButton: {
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+  },
+  lastButton: {
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  divider: {
+    width: 1,
+    backgroundColor: "#d0d7dd",
+    alignSelf: "stretch",
+  },
+  priceTypeButtonActive: {
+    backgroundColor: "#1a237e",
+  },
+  priceTypeButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#546e7a",
+  },
+  priceTypeButtonTextActive: {
+    color: "#ffffff",
+    fontWeight: "600",
+  },
+  formError: {
+    color: "#d32f2f",
+    fontSize: 13,
+    marginTop: 8,
+  },
+  saveContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#fff",
     padding: 16,
-    marginBottom: 30,
-    marginTop: 10,
+    borderRadius: 16,
     elevation: 3,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
-    shadowRadius: 5,
+    shadowRadius: 6,
+    marginTop: 16,
   },
-  summaryInfo: {
-    flex: 1,
+  totalCount: {
+    fontSize: 15,
+    color: "#455a64",
+    fontWeight: "500",
   },
-  summaryText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#37474f',
-  },
-  saveButton: {
-    backgroundColor: '#1a237e',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+  saveBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1a237e",
     paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
+    paddingHorizontal: 24,
+    borderRadius: 12,
   },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+  saveBtnSaved: {
+    backgroundColor: "#43a047",
   },
-  savedButton: {
-    backgroundColor: "#4caf50",
+  saveBtnText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+    marginLeft: 10,
   },
 });
 

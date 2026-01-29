@@ -14,6 +14,7 @@ import {
   Switch,
   Alert,
 } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 import Toast from "react-native-toast-message";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
@@ -135,6 +136,110 @@ const UserAccount = ({ route, navigation }) => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const uploadProfilePicture = async (uri) => {
+    try {
+      const token = await AsyncStorage.getItem("authToken");
+      if (!token) throw new Error("Authentication token is missing.");
+
+      // Safety check: wait for userDetails to be loaded
+      if (!userDetails || !userDetails.id) {
+        throw new Error("User details not loaded yet. Please try again.");
+      }
+
+      const uriParts = uri.split('.');
+      const fileType = uriParts[uriParts.length - 1];
+
+      const formData = new FormData();
+      formData.append("profileImage", {
+        uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
+        name: `profile_${Date.now()}.${fileType}`,
+        type: `image/${fileType === 'jpg' ? 'jpeg' : fileType}`,
+      });
+
+      console.log("Uploading file:", {
+        uri,
+        name: `profile_${Date.now()}.${fileType}`,
+        type: `image/${fileType === 'jpg' ? 'jpeg' : fileType}`,
+      });
+
+      const response = await fetch(
+        `https://service-booking-backend-eb9i.onrender.com/api/auth/update-profile-picture/${userDetails.id}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Accept': 'application/json',
+          },
+          body: formData,
+        }
+      );
+
+      const rawText = await response.text();
+      console.log("Raw Response Text:", rawText);
+
+      if (!response.ok) throw new Error(`Server Error: ${response.status} - ${rawText}`);
+
+      const data = JSON.parse(rawText);
+      console.log("Upload successful:", data);
+
+      Toast.show({
+        type: "success",
+        text1: "Profile Updated",
+        text2: "Your profile picture has been updated.",
+      });
+
+      setUserDetails((prev) => ({
+        ...prev,
+        profileImage: data.profileImage,
+      }));
+    } catch (error) {
+      console.error("Error uploading profile picture:", error.message || error);
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: error.message || "Failed to upload profile picture.",
+      });
+    }
+  };
+
+  const pickImageFromGallery = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 1,
+      });
+
+      console.log("Image Picker Result:", result);
+      if (!result.canceled && result.assets && result.assets[0]?.uri) {
+        await uploadProfilePicture(result.assets[0].uri);
+      } else {
+        console.error("Image selection canceled or invalid result.");
+      }
+    } catch (error) {
+      console.error("Error picking image from gallery:", error);
+    }
+  };
+
+  const takePhoto = async () => {
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 1,
+      });
+
+      console.log("Camera Result:", result);
+      if (!result.canceled && result.assets && result.assets[0]?.uri) {
+        await uploadProfilePicture(result.assets[0].uri);
+      } else {
+        console.error("Photo capture canceled or invalid result.");
+      }
+    } catch (error) {
+      console.error("Error taking photo:", error);
     }
   };
 
@@ -273,107 +378,6 @@ const UserAccount = ({ route, navigation }) => {
         text1: "Error",
         text2: error.message || "Failed to upload image.",
       });
-    }
-  };
-
-  const uploadProfilePicture = async (uri) => {
-    try {
-      const token = await AsyncStorage.getItem("authToken");
-      if (!token) throw new Error("Authentication token is missing.");
-      if (!userDetails || !userDetails.id) throw new Error("User details are missing or invalid.");
-
-      const uriParts = uri.split('.');
-      const fileType = uriParts[uriParts.length - 1];
-
-      const formData = new FormData();
-      formData.append("profileImage", {
-        uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
-        name: `profile_${Date.now()}.${fileType}`,
-        type: `image/${fileType === 'jpg' ? 'jpeg' : fileType}`,
-      });
-
-      const response = await fetch(
-        `https://service-booking-backend-eb9i.onrender.com/api/auth/update-profile-picture/${userDetails.id}`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Accept': 'application/json',
-          },
-          body: formData,
-        }
-      );
-
-      const rawText = await response.text();
-
-      if (!response.ok) throw new Error(`Server Error: ${response.status} - ${rawText}`);
-
-      const data = JSON.parse(rawText);
-
-      Toast.show({
-        type: "success",
-        text1: "Profile Updated",
-        text2: "Your profile picture has been updated.",
-      });
-
-      setUserDetails((prev) => ({
-        ...prev,
-        profileImage: data.profileImage,
-      }));
-
-      setBottomSidebarVisible(false);
-    } catch (error) {
-      console.error("Error uploading profile picture:", error.message || error);
-      Toast.show({
-        type: "error",
-        text1: "Error",
-        text2: error.message || "Failed to upload profile picture.",
-      });
-    }
-  };
-
-  const pickImageFromGallery = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Toast.show({
-        type: "error",
-        text1: "Permission needed",
-        text2: "Please grant camera roll permissions to upload photos.",
-      });
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      await uploadProfilePicture(result.assets[0].uri);
-    }
-  };
-
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Toast.show({
-        type: "error",
-        text1: "Permission needed",
-        text2: "Please grant camera permissions to take photos.",
-      });
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      await uploadProfilePicture(result.assets[0].uri);
     }
   };
 
@@ -588,14 +592,20 @@ const UserAccount = ({ route, navigation }) => {
           <Text style={styles.bottomSidebarTitle}>Update Profile Picture</Text>
           <TouchableOpacity
             style={styles.optionButton}
-            onPress={pickImageFromGallery}
+            onPress={() => {
+              setBottomSidebarVisible(false);
+              pickImageFromGallery();
+            }}
           >
             <MaterialIcons name="photo-library" size={28} color="#1a237e" />
             <Text style={styles.optionText}>Choose from Gallery</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.optionButton}
-            onPress={takePhoto}
+            onPress={() => {
+              setBottomSidebarVisible(false);
+              takePhoto();
+            }}
           >
             <MaterialIcons name="camera-alt" size={28} color="#1a237e" />
             <Text style={styles.optionText}>Take a Photo</Text>
@@ -725,7 +735,7 @@ const UserAccount = ({ route, navigation }) => {
             </View>
           )}
 
-          {editableFields.services.length === 0 ? (
+          {(!editableFields.services || editableFields.services.length === 0) ? (
             <Text style={styles.noServicesText}>
               No services listed. Add services to display them here.
             </Text>
@@ -900,7 +910,6 @@ const UserAccount = ({ route, navigation }) => {
       ) : (
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
-            {/* Avatar positioned higher with less overlap */}
             <View style={styles.avatarWrapper}>
               <TouchableOpacity onPress={() => setBottomSidebarVisible(true)}>
                 <Image
@@ -918,7 +927,6 @@ const UserAccount = ({ route, navigation }) => {
               </TouchableOpacity>
             </View>
 
-            {/* Header details moved higher (closer to top) */}
             <View style={styles.headerTextContainer}>
               <Text style={styles.userName}>{userDetails.name}</Text>
               <View style={styles.roleBadge}>
@@ -940,7 +948,6 @@ const UserAccount = ({ route, navigation }) => {
             </View>
           </View>
 
-          {/* Content card starts lower to avoid any collision */}
           <View style={styles.contentCard}>
             <View style={styles.contentHeader}>
               <Text style={styles.contentTitle}>Account Details</Text>
@@ -996,13 +1003,13 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#1a237e',
     paddingTop: 60,
-    paddingBottom: 80, // Reduced to move everything up
+    paddingBottom: 80,
     alignItems: 'center',
     position: 'relative',
   },
   avatarWrapper: {
     position: 'absolute',
-    bottom: -50, // Moved up significantly (less overlap)
+    bottom: -50,
     zIndex: 10,
   },
   profileImage: {
@@ -1030,7 +1037,7 @@ const styles = StyleSheet.create({
   },
   headerTextContainer: {
     alignItems: 'center',
-    marginTop: 20, // Moved details higher (reduced from previous large margin)
+    marginTop: 20,
   },
   userName: {
     fontSize: 32,
@@ -1052,7 +1059,7 @@ const styles = StyleSheet.create({
   },
   statusBadgeContainer: {
     marginTop: 20,
-     marginBottom: 50,
+    marginBottom: 50,
   },
   statusBadge: {
     flexDirection: 'row',
@@ -1071,14 +1078,13 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontSize: 16,
     fontWeight: '700',
-   
   },
   contentCard: {
     backgroundColor: '#ffffff',
-    marginTop: -40, // Reduced overlap
+    marginTop: -40,
     borderTopLeftRadius: 36,
     borderTopRightRadius: 36,
-    paddingTop: 80, // Increased to push "Account Details" down, clearing avatar completely
+    paddingTop: 80,
     paddingHorizontal: 24,
     paddingBottom: 60,
     elevation: 20,

@@ -8,11 +8,11 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1a237e"
+      "resizeMode": "cover",
+      "backgroundColor": "#1a237e",
+      "enableFullScreenImage_legacy": true
     },
     "ios": {
       "supportsTablet": true,
@@ -46,6 +46,10 @@
       "eas": {
         "projectId": "4de16de2-0d33-4ca2-842a-a7b325baa3fd"
       }
-    }
+    },
+    "plugins": [
+      "expo-font",
+      "@react-native-community/datetimepicker"
+    ]
   }
 }

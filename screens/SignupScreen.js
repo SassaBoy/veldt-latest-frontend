@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react";
-import { Alert } from "react-native";
+import { Alert, ActivityIndicator } from "react-native";
 import {
   View,
   Text,
@@ -18,7 +18,6 @@ import Icon from "react-native-vector-icons/MaterialIcons";
 import Toast from "react-native-toast-message";
 import axios from "axios";
 
-
 const { width } = Dimensions.get("window");
 
 const SignupScreen = ({ route, navigation }) => {
@@ -34,12 +33,12 @@ const SignupScreen = ({ route, navigation }) => {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
-const [loading, setLoading] = useState(false); // Add loading state
+  const [loading, setLoading] = useState(false);
 
-
-  const validNamibianPrefixes = useMemo(() => [
-    "061", "062", "063", "064", "065", "066", "067", "060", "081", "083", "084", "085",
-  ], []);
+  const validNamibianPrefixes = useMemo(
+    () => ["061", "062", "063", "064", "065", "066", "067", "060", "081", "083", "084", "085"],
+    []
+  );
 
   const validateEmail = useCallback((email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -50,14 +49,17 @@ const [loading, setLoading] = useState(false); // Add loading state
     return password.length >= 8 && /[A-Z]/.test(password) && /[0-9]/.test(password);
   }, []);
 
-  const validatePhone = useCallback((phone) => {
-    if (phone.length < 10) return false;
-    const prefix = phone.substring(0, 3);
-    return validNamibianPrefixes.includes(prefix);
-  }, [validNamibianPrefixes]);
+  const validatePhone = useCallback(
+    (phone) => {
+      if (phone.length < 10) return false;
+      const prefix = phone.substring(0, 3);
+      return validNamibianPrefixes.includes(prefix);
+    },
+    [validNamibianPrefixes]
+  );
 
   const handleFieldTouch = (fieldName) => {
-    setTouchedFields(prev => ({ ...prev, [fieldName]: true }));
+    setTouchedFields((prev) => ({ ...prev, [fieldName]: true }));
   };
 
   const validateForm = useCallback(() => {
@@ -65,7 +67,8 @@ const [loading, setLoading] = useState(false); // Add loading state
     if (!name) newErrors.name = "Name is required.";
     if (!email || !validateEmail(email)) newErrors.email = "Invalid email address.";
     if (!password || !validatePassword(password)) {
-      newErrors.password = "Password must be at least 8 characters, contain an uppercase letter, and a number.";
+      newErrors.password =
+        "Password must be at least 8 characters, contain an uppercase letter, and a number.";
     }
     if (!phone || !validatePhone(phone)) {
       newErrors.phone = "Invalid phone number for Namibia.";
@@ -98,17 +101,16 @@ const [loading, setLoading] = useState(false); // Add loading state
     }
   };
 
-  
   const handleSignup = async () => {
     setHasSubmitted(true);
     setErrors({});
-    setLoading(true); // Start loading
-  
+    setLoading(true);
+
     if (!isFormValid) {
       setLoading(false);
       return;
     }
-  
+
     const formData = new FormData();
     formData.append("role", role);
     formData.append("name", name);
@@ -118,20 +120,20 @@ const [loading, setLoading] = useState(false); // Add loading state
     if (role === "Provider" && businessName) {
       formData.append("businessName", businessName);
     }
-  
+
     if (profileImage) {
       const imageUri = profileImage;
       const filename = imageUri.split("/").pop();
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : "image";
-  
+
       formData.append("profileImage", {
         uri: imageUri,
         name: filename,
         type,
       });
     }
-  
+
     try {
       const response = await axios.post(
         "https://service-booking-backend-eb9i.onrender.com/api/auth/register/" + role,
@@ -142,7 +144,7 @@ const [loading, setLoading] = useState(false); // Add loading state
           },
         }
       );
-  
+
       if (response.data.redirect) {
         Alert.alert(
           "Incomplete Application",
@@ -167,15 +169,13 @@ const [loading, setLoading] = useState(false); // Add loading state
         );
         return;
       }
-  
-      // Show success toast
+
       Toast.show({
         type: "success",
         text1: "Success",
         text2: `Signed up successfully as ${role}!`,
       });
-  
-      // Navigate after a slight delay for better UX
+
       setTimeout(() => {
         if (role === "Provider") {
           navigation.navigate("CompleteProfile", {
@@ -186,7 +186,6 @@ const [loading, setLoading] = useState(false); // Add loading state
           navigation.navigate("Login", { role });
         }
       }, 1000);
-  
     } catch (error) {
       let errorMessage = "Registration failed. Please try again.";
       if (error.response?.data?.message) {
@@ -198,22 +197,19 @@ const [loading, setLoading] = useState(false); // Add loading state
         if (Object.keys(newErrors).length === 0) newErrors.general = errorMessage;
         setErrors(newErrors);
       }
-  
-      // Show error toast
+
       Toast.show({
         type: "error",
         text1: "Registration Error",
         text2: errorMessage,
       });
-  
     } finally {
-      setLoading(false); // Stop loading
+      setLoading(false);
     }
   };
-  
-  
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
@@ -222,141 +218,268 @@ const [loading, setLoading] = useState(false); // Add loading state
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* Header */}
           <View style={styles.header}>
-            <Icon name="person-add" size={40} color="#1a237e" />
-            <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Sign up as {role}</Text>
+            <View style={styles.iconContainer}>
+              <View style={styles.iconInnerCircle}>
+                <Icon name="person-add" size={48} color="#1a237e" />
+              </View>
+            </View>
+            <Text style={styles.title}>Create Your Account</Text>
+            <Text style={styles.subtitle}>Join as a {role}</Text>
           </View>
-  
+
+          {/* Role Badge */}
+          <View style={styles.roleBadge}>
+            <Icon
+              name={role === "Provider" ? "business-center" : "person"}
+              size={18}
+              color="#1a237e"
+            />
+            <Text style={styles.roleBadgeText}>{role} Registration</Text>
+          </View>
+
+          {/* Form */}
           <View style={styles.form}>
-            <TouchableOpacity
-              style={styles.imagePicker}
-              onPress={pickImage}
-              activeOpacity={0.8}
-            >
-              {profileImage ? (
-                <Image source={{ uri: profileImage }} style={styles.profileImage} />
-              ) : (
-                <View style={styles.imagePlaceholder}>
-                  <Icon name="person" size={40} color="#FFF" />
-                </View>
-              )}
-              <Text style={styles.imageText}>
-                {profileImage ? "Change Profile Image" : "Upload Profile Image"}
-              </Text>
-            </TouchableOpacity>
-  
-            {errors.general && <Text style={styles.errorText}>{errors.general}</Text>}
-  
-            <View style={styles.inputContainer}>
-              <Icon name="person" size={20} color="#7F8C8D" style={styles.icon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Full Name"
-                placeholderTextColor="#95A5A6"
-                value={name}
-                onChangeText={setName}
-                onBlur={() => handleFieldTouch('name')}
-              />
-            </View>
-            {shouldShowError('name') && <Text style={styles.errorText}>{errors.name}</Text>}
-  
-            <View style={styles.inputContainer}>
-              <Icon name="email" size={20} color="#7F8C8D" style={styles.icon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Email"
-                placeholderTextColor="#95A5A6"
-                value={email}
-                onChangeText={setEmail}
-                onBlur={() => handleFieldTouch('email')}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-            {shouldShowError('email') && <Text style={styles.errorText}>{errors.email}</Text>}
-  
-            <View style={styles.inputContainer}>
-              <Icon name="lock" size={20} color="#7F8C8D" style={styles.icon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Password"
-                placeholderTextColor="#95A5A6"
-                value={password}
-                onChangeText={setPassword}
-                onBlur={() => handleFieldTouch('password')}
-                secureTextEntry={!isPasswordVisible}
-                autoCapitalize="none"
-              />
+            {/* Profile Image Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Profile Photo</Text>
               <TouchableOpacity
-                onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-                style={styles.eyeIcon}
+                style={styles.imagePickerCard}
+                onPress={pickImage}
+                activeOpacity={0.8}
               >
-                <Icon
-                  name={isPasswordVisible ? "visibility" : "visibility-off"}
-                  size={20}
-                  color="#7F8C8D"
-                />
+                {profileImage ? (
+                  <View style={styles.imagePreviewContainer}>
+                    <Image source={{ uri: profileImage }} style={styles.profileImage} />
+                    <View style={styles.imageOverlay}>
+                      <Icon name="camera-alt" size={28} color="#fff" />
+                      <Text style={styles.changeImageText}>Change Photo</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.imagePlaceholder}>
+                    <View style={styles.placeholderIconCircle}>
+                      <Icon name="add-a-photo" size={36} color="#1a237e" />
+                    </View>
+                    <Text style={styles.imageText}>Upload Profile Photo</Text>
+                    <Text style={styles.imageSubtext}>JPG, PNG • Max 5MB</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
-            {shouldShowError('password') && <Text style={styles.errorText}>{errors.password}</Text>}
-  
-            <View style={styles.inputContainer}>
-              <Icon name="phone" size={20} color="#7F8C8D" style={styles.icon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Phone Number"
-                placeholderTextColor="#95A5A6"
-                value={phone}
-                onChangeText={setPhone}
-                onBlur={() => handleFieldTouch('phone')}
-                keyboardType="phone-pad"
-              />
-            </View>
-            {shouldShowError('phone') && <Text style={styles.errorText}>{errors.phone}</Text>}
-  
-            {role === "Provider" && (
-              <View style={styles.inputContainer}>
-                <Icon name="business" size={20} color="#7F8C8D" style={styles.icon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Business Name"
-                  placeholderTextColor="#95A5A6"
-                  value={businessName}
-                  onChangeText={setBusinessName}
-                  onBlur={() => handleFieldTouch('businessName')}
-                />
+
+            {/* Error Message */}
+            {errors.general && (
+              <View style={styles.errorBanner}>
+                <Icon name="error-outline" size={20} color="#d32f2f" />
+                <Text style={styles.errorBannerText}>{errors.general}</Text>
               </View>
             )}
-            {shouldShowError('businessName') && <Text style={styles.errorText}>{errors.businessName}</Text>}
-  
-            <TouchableOpacity
-  style={[
-    styles.button,
-    !isFormValid && styles.disabledButton,
-    loading && { backgroundColor: "#9ea1c7", flexDirection: "row", justifyContent: "center", alignItems: "center" }
-  ]}
-  onPress={handleSignup}
-  disabled={!isFormValid || loading}
->
-  {loading ? (
-    <>
-      <Icon name="autorenew" size={20} color="#fff" style={{ marginRight: 10 }} />
-      <Text style={styles.buttonText}>Signing up...</Text>
-    </>
-  ) : (
-    <Text style={styles.buttonText}>Create Account</Text>
-  )}
-</TouchableOpacity>
 
+            {/* Personal Information */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Personal Information</Text>
+
+              <View style={styles.inputGroup}>
+                <View style={styles.inputContainer}>
+                  <Icon name="person-outline" size={20} color="#1a237e" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Full Name"
+                    placeholderTextColor="#999"
+                    value={name}
+                    onChangeText={setName}
+                    onBlur={() => handleFieldTouch("name")}
+                  />
+                </View>
+                {shouldShowError("name") && (
+                  <View style={styles.errorContainer}>
+                    <Icon name="error" size={14} color="#d32f2f" />
+                    <Text style={styles.errorText}>{errors.name}</Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <View style={styles.inputContainer}>
+                  <Icon name="email" size={20} color="#1a237e" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email Address"
+                    placeholderTextColor="#999"
+                    value={email}
+                    onChangeText={setEmail}
+                    onBlur={() => handleFieldTouch("email")}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+                {shouldShowError("email") && (
+                  <View style={styles.errorContainer}>
+                    <Icon name="error" size={14} color="#d32f2f" />
+                    <Text style={styles.errorText}>{errors.email}</Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <View style={styles.inputContainer}>
+                  <Icon name="phone" size={20} color="#1a237e" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Phone Number"
+                    placeholderTextColor="#999"
+                    value={phone}
+                    onChangeText={setPhone}
+                    onBlur={() => handleFieldTouch("phone")}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+                {shouldShowError("phone") && (
+                  <View style={styles.errorContainer}>
+                    <Icon name="error" size={14} color="#d32f2f" />
+                    <Text style={styles.errorText}>{errors.phone}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Security */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Security</Text>
+
+              <View style={styles.inputGroup}>
+                <View style={styles.inputContainer}>
+                  <Icon name="lock-outline" size={20} color="#1a237e" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Create Password"
+                    placeholderTextColor="#999"
+                    value={password}
+                    onChangeText={setPassword}
+                    onBlur={() => handleFieldTouch("password")}
+                    secureTextEntry={!isPasswordVisible}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity
+                    onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+                    style={styles.eyeIcon}
+                  >
+                    <Icon
+                      name={isPasswordVisible ? "visibility" : "visibility-off"}
+                      size={22}
+                      color="#1a237e"
+                    />
+                  </TouchableOpacity>
+                </View>
+                {shouldShowError("password") && (
+                  <View style={styles.errorContainer}>
+                    <Icon name="error" size={14} color="#d32f2f" />
+                    <Text style={styles.errorText}>{errors.password}</Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.passwordHints}>
+                <View style={styles.hintRow}>
+                  <Icon
+                    name={password.length >= 8 ? "check-circle" : "radio-button-unchecked"}
+                    size={16}
+                    color={password.length >= 8 ? "#4CAF50" : "#ccc"}
+                  />
+                  <Text style={[styles.hintText, password.length >= 8 && styles.hintTextValid]}>
+                    At least 8 characters
+                  </Text>
+                </View>
+                <View style={styles.hintRow}>
+                  <Icon
+                    name={/[A-Z]/.test(password) ? "check-circle" : "radio-button-unchecked"}
+                    size={16}
+                    color={/[A-Z]/.test(password) ? "#4CAF50" : "#ccc"}
+                  />
+                  <Text style={[styles.hintText, /[A-Z]/.test(password) && styles.hintTextValid]}>
+                    One uppercase letter
+                  </Text>
+                </View>
+                <View style={styles.hintRow}>
+                  <Icon
+                    name={/[0-9]/.test(password) ? "check-circle" : "radio-button-unchecked"}
+                    size={16}
+                    color={/[0-9]/.test(password) ? "#4CAF50" : "#ccc"}
+                  />
+                  <Text style={[styles.hintText, /[0-9]/.test(password) && styles.hintTextValid]}>
+                    One number
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Business Information (Provider Only) */}
+            {role === "Provider" && (
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Business Information</Text>
+
+                <View style={styles.inputGroup}>
+                  <View style={styles.inputContainer}>
+                    <Icon name="business" size={20} color="#1a237e" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Business Name"
+                      placeholderTextColor="#999"
+                      value={businessName}
+                      onChangeText={setBusinessName}
+                      onBlur={() => handleFieldTouch("businessName")}
+                    />
+                  </View>
+                  {shouldShowError("businessName") && (
+                    <View style={styles.errorContainer}>
+                      <Icon name="error" size={14} color="#d32f2f" />
+                      <Text style={styles.errorText}>{errors.businessName}</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+
+            {/* Submit Button */}
             <TouchableOpacity
-              style={styles.loginLink}
-              onPress={() => navigation.navigate("Login", { role })}
+              style={[
+                styles.submitButton,
+                (!isFormValid || loading) && styles.submitButtonDisabled,
+              ]}
+              onPress={handleSignup}
+              disabled={!isFormValid || loading}
+              activeOpacity={0.8}
             >
-              <Text style={styles.loginText}>
-                Already have an account? <Text style={styles.loginHighlight}>Login</Text>
-              </Text>
+              {loading ? (
+                <View style={styles.buttonContent}>
+                  <ActivityIndicator color="#fff" size="small" />
+                  <Text style={styles.submitButtonText}>Creating Account...</Text>
+                </View>
+              ) : (
+                <View style={styles.buttonContent}>
+                  <Icon name="check-circle" size={22} color="#fff" />
+                  <Text style={styles.submitButtonText}>Create Account</Text>
+                </View>
+              )}
             </TouchableOpacity>
+
+            {/* Login Link */}
+            <View style={styles.loginContainer}>
+              <Text style={styles.loginText}>Already have an account? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate("Login", { role })}>
+                <Text style={styles.loginLink}>Sign In</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Security Notice */}
+            <View style={styles.securityNotice}>
+              <Icon name="lock" size={16} color="#4CAF50" />
+              <Text style={styles.securityText}>
+                Your data is encrypted and stored securely
+              </Text>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -366,9 +489,9 @@ const [loading, setLoading] = useState(false); // Add loading state
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#f8f9fc",
   },
   keyboardView: {
     flex: 1,
@@ -376,136 +499,308 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 20,
     paddingBottom: 40,
   },
   header: {
     alignItems: "center",
-    marginBottom: 10,
-    marginTop: 50,
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  iconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#1a237e",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  iconInnerCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(26, 35, 126, 0.08)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#2C3E50",
-    marginTop: 20,
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#1a237e",
     marginBottom: 8,
+    textAlign: "center",
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 16,
-    color: "#7F8C8D",
+    fontSize: 15,
+    color: "#666",
+    textAlign: "center",
+  },
+  roleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(26, 35, 126, 0.08)",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignSelf: "center",
+    marginBottom: 24,
+    gap: 8,
+  },
+  roleBadgeText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1a237e",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   form: {
     width: "100%",
-    maxWidth: 400,
-    alignSelf: "center",
   },
-  imagePicker: {
+  section: {
+    marginBottom: 24,
+  },
+  sectionLabel: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1a237e",
+    marginBottom: 12,
+    letterSpacing: -0.3,
+  },
+  imagePickerCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "#e0e0e0",
+    borderStyle: "dashed",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  imagePreviewContainer: {
+    position: "relative",
     alignItems: "center",
-    marginBottom: 30,
+    padding: 20,
   },
   profileImage: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    marginBottom: 12,
     borderWidth: 3,
     borderColor: "#1a237e",
   },
-  imagePlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "#1a237e",
-    justifyContent: "center",
+  imageOverlay: {
+    position: "absolute",
+    bottom: 20,
+    backgroundColor: "rgba(26, 35, 126, 0.9)",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    gap: 8,
+  },
+  changeImageText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  imagePlaceholder: {
+    alignItems: "center",
+    padding: 32,
+  },
+  placeholderIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(26, 35, 126, 0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
   },
   imageText: {
-    fontSize: 14,
-    color: "#1a237e",
+    fontSize: 16,
     fontWeight: "600",
+    color: "#1a237e",
+    marginBottom: 6,
+  },
+  imageSubtext: {
+    fontSize: 13,
+    color: "#999",
+  },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffebee",
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 20,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "#ef5350",
+  },
+  errorBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#d32f2f",
+    fontWeight: "500",
+  },
+  inputGroup: {
+    marginBottom: 16,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#fff",
     borderRadius: 12,
-    borderColor: "#E0E0E0",
     borderWidth: 1,
-    marginBottom: 16,
+    borderColor: "#e0e0e0",
     paddingHorizontal: 16,
     height: 56,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
   },
-  icon: {
+  inputIcon: {
     marginRight: 12,
   },
   input: {
     flex: 1,
-    fontSize: 16,
-    color: "#2C3E50",
+    fontSize: 15,
+    color: "#333",
   },
   eyeIcon: {
     padding: 8,
   },
-  button: {
-    backgroundColor: "#1a237e",
-    padding: 16,
-    borderRadius: 12,
-    width: "100%",
+  errorContainer: {
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
-    shadowColor: "#1a237e",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  disabledButton: {
-    backgroundColor: "#9ea1c7",
-    shadowOpacity: 0.1,
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  loginLink: {
-    alignItems: "center",
-    marginTop: 20,
-  },
-  loginText: {
-    fontSize: 15,
-    color: "#7F8C8D",
-  },
-  loginHighlight: {
-    color: "#9ea1c7",
-    fontWeight: "600",
+    marginTop: 6,
+    marginLeft: 16,
+    gap: 6,
   },
   errorText: {
-    color: "red",
     fontSize: 12,
-    marginTop: -12,
-    marginBottom: 8,
-    marginLeft: 16,
+    color: "#d32f2f",
+    flex: 1,
   },
-  serverErrorContainer: {
-    backgroundColor: "#FFE5E5",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#FFA5A5",
+  passwordHints: {
+    backgroundColor: "#f5f7fa",
+    padding: 14,
+    borderRadius: 12,
+    marginTop: 8,
+    gap: 8,
   },
-  serverErrorText: {
-    color: "#D63031",
+  hintRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  hintText: {
+    fontSize: 13,
+    color: "#999",
+  },
+  hintTextValid: {
+    color: "#4CAF50",
+    fontWeight: "500",
+  },
+  submitButton: {
+    backgroundColor: "#1a237e",
+    paddingVertical: 18,
+    borderRadius: 14,
+    marginTop: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#1a237e",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+  },
+  submitButtonDisabled: {
+    backgroundColor: "#bdbdbd",
+    ...Platform.select({
+      ios: {
+        shadowOpacity: 0,
+      },
+      android: {
+        elevation: 0,
+      },
+    }),
+  },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  submitButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  loginContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 24,
+  },
+  loginText: {
     fontSize: 14,
-    textAlign: "center",
+    color: "#666",
+  },
+  loginLink: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1a237e",
+  },
+  securityNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 16,
+    marginTop: 8,
+  },
+  securityText: {
+    fontSize: 12,
+    color: "#666",
+    fontStyle: "italic",
   },
 });
 

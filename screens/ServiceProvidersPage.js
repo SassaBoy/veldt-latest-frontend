@@ -10,13 +10,14 @@ import {
   TextInput,
   ActivityIndicator,
   Dimensions,
+  Platform,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/Ionicons";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import RNPickerSelect from "react-native-picker-select";
-
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 const { width } = Dimensions.get("window");
 
 const ServiceProvidersPage = ({ route }) => {
@@ -127,41 +128,61 @@ const ServiceProvidersPage = ({ route }) => {
       activeOpacity={0.92}
       onPress={() => handleProviderClick(item)}
     >
-      <Image
-        source={{
-          uri: item.profileImage
-            ? `https://service-booking-backend-eb9i.onrender.com/${item.profileImage.replace(/\\/g, "/")}`
-            : "https://service-booking-backend-eb9i.onrender.com/uploads/default-profile.png",
-        }}
-        style={styles.providerImage}
-        resizeMode="cover"
-      />
-      <View style={styles.detailsContainer}>
-        <Text style={styles.providerName}>{item.name}</Text>
-        <Text style={styles.providerAddress}>{item.businessAddress || "Location not provided"}</Text>
-
-        <View style={styles.ratingRow}>
-          <Text style={styles.ratingText}>
-            ★ {item.averageRating !== "0.0" ? item.averageRating : "No rating"}
-          </Text>
-          <Text style={styles.reviewCount}>
-            ({item.reviewCount} {item.reviewCount === 1 ? "review" : "reviews"})
-          </Text>
+      <View style={styles.cardContent}>
+        <View style={styles.imageWrapper}>
+          <Image
+            source={{
+              uri: item.profileImage
+                ? `https://service-booking-backend-eb9i.onrender.com/${item.profileImage.replace(/\\/g, "/")}`
+                : "https://service-booking-backend-eb9i.onrender.com/uploads/default-profile.png",
+            }}
+            style={styles.providerImage}
+            resizeMode="cover"
+          />
         </View>
-
-        <Text style={styles.description} numberOfLines={2}>
-          {item.description || "No description available."}
-        </Text>
-
-        {item.servicePrice && (
-          <View style={styles.priceBadge}>
-            <Text style={styles.priceText}>N$ {item.servicePrice}</Text>
+        
+        <View style={styles.detailsContainer}>
+          <View style={styles.headerRow}>
+            <View style={styles.nameAndRating}>
+              <Text style={styles.providerName} numberOfLines={1}>
+                {item.name}
+              </Text>
+              <View style={styles.ratingRow}>
+                <View style={styles.ratingBadge}>
+                  <Icon name="star" size={14} color="#FFA000" />
+                  <Text style={styles.ratingText}>
+                    {item.averageRating !== "0.0" ? item.averageRating : "New"}
+                  </Text>
+                </View>
+                <Text style={styles.reviewCount}>
+                  ({item.reviewCount})
+                </Text>
+              </View>
+            </View>
           </View>
-        )}
-      </View>
 
-      <View style={styles.arrowContainer}>
-        <Icon name="chevron-forward" size={28} color="#adb5bd" />
+          <View style={styles.locationRow}>
+            <Icon name="location-outline" size={16} color="#666" />
+            <Text style={styles.providerAddress} numberOfLines={1}>
+              {item.businessAddress || "Location not provided"}
+            </Text>
+          </View>
+
+          <Text style={styles.description} numberOfLines={2}>
+            {item.description || "No description available."}
+          </Text>
+
+          <View style={styles.footerRow}>
+            {item.servicePrice && (
+              <View style={styles.priceBadge}>
+                <Text style={styles.priceText}>N$ {item.servicePrice}</Text>
+              </View>
+            )}
+            <View style={styles.arrowContainer}>
+              <Icon name="chevron-forward" size={24} color="#adb5bd" />
+            </View>
+          </View>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -219,8 +240,10 @@ const ServiceProvidersPage = ({ route }) => {
         </View>
 
         <View style={styles.sortContainer}>
-          <Icon name="swap-vertical-outline" size={22} color="#1a237e" />
-          <Text style={styles.sortLabel}>Sort by:</Text>
+          <View style={styles.sortLabelContainer}>
+            <Icon name="swap-vertical-outline" size={20} color="#1a237e" />
+            <Text style={styles.sortLabel}>Sort by</Text>
+          </View>
           <View style={styles.pickerWrapper}>
             <RNPickerSelect
               onValueChange={setSortOption}
@@ -232,11 +255,15 @@ const ServiceProvidersPage = ({ route }) => {
               ]}
               value={sortOption}
               style={pickerSelectStyles}
-              placeholder={{}} // No placeholder - always shows selected
-            
+              placeholder={{}}
+              useNativeAndroidPickerStyle={false}
+              Icon={() => (
+                <View style={styles.pickerIcon}>
+                  <Icon name="chevron-down" size={20} color="#1a237e" />
+                </View>
+              )}
             />
           </View>
-          <Text style={styles.currentSortText}>{getSortLabel()}</Text>
         </View>
       </View>
 
@@ -258,20 +285,32 @@ const ServiceProvidersPage = ({ route }) => {
 
 const pickerSelectStyles = {
   inputIOS: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#1a237e',
-    paddingRight: 30,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingRight: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(26, 35, 126, 0.05)',
   },
   inputAndroid: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#1a237e',
-    paddingRight: 30,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingRight: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(26, 35, 126, 0.05)',
   },
   placeholder: {
     color: '#1a237e',
     fontWeight: '600',
+  },
+  iconContainer: {
+    top: Platform.OS === 'ios' ? 12 : 10,
+    right: 12,
   },
 };
 
@@ -343,32 +382,35 @@ const styles = StyleSheet.create({
   sortContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#fff',
     borderRadius: 24,
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 14,
     elevation: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
   },
+  sortLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   sortLabel: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    marginRight: 12,
   },
   pickerWrapper: {
     flex: 1,
-    marginRight: 12,
+    marginLeft: 12,
   },
-  currentSortText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a237e',
-    minWidth: 120,
-    textAlign: 'right',
+pickerIcon: {
+    position: 'absolute',
+    right: 12,
+    top: Platform.OS === 'ios' ? 1 : 12,
   },
   listContainer: {
     paddingHorizontal: 20,
@@ -376,73 +418,120 @@ const styles = StyleSheet.create({
   },
   providerCard: {
     backgroundColor: '#fff',
-    borderRadius: 28,
-    marginBottom: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 24,
-    elevation: 8,
+    borderRadius: 20,
+    marginBottom: 16,
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    overflow: 'hidden',
+  },
+  cardContent: {
+    flexDirection: 'row',
+    padding: 16,
+  },
+  imageWrapper: {
+    marginRight: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   providerImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 80,
+    height: 80,
+    borderRadius: 16,
     backgroundColor: '#e9ecef',
   },
   detailsContainer: {
     flex: 1,
-    marginLeft: 24,
+    justifyContent: 'space-between',
   },
-  providerName: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1a237e',
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 8,
   },
-  providerAddress: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 12,
+  nameAndRating: {
+    flex: 1,
+    gap: 6,
+  },
+  providerName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a237e',
+    letterSpacing: -0.3,
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    gap: 6,
+  },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 160, 0, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
   },
   ratingText: {
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
     color: '#FFA000',
-    marginRight: 10,
   },
   reviewCount: {
-    fontSize: 16,
+    fontSize: 13,
     color: '#999',
+    fontWeight: '500',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 8,
+  },
+  providerAddress: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
   },
   description: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#555',
-    lineHeight: 24,
+    lineHeight: 20,
     marginBottom: 12,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   priceBadge: {
     backgroundColor: '#E8F5E9',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
   priceText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#4CAF50',
+    letterSpacing: -0.2,
   },
   arrowContainer: {
-    paddingLeft: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyContainer: {
     flex: 1,
