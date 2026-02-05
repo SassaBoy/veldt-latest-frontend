@@ -43,6 +43,7 @@ import ThankYou1Screen from "../screens/ThankYou1Screen";
 import PaymentReminder from "../screens/PaymentReminder";
 import SafetyFeaturesScreen from "../screens/SafetyFeaturesScreen";
 import PaymentTermsScreen from "../screens/PaymentTerms";
+import AboutScreen from "../screens/AboutScreen";   // ← add this line
 
 const Stack = createStackNavigator();
 
@@ -119,6 +120,7 @@ const StackNavigator = () => {
         <Stack.Screen name="LoadingScreen" component={LoadingScreen} />
         <Stack.Screen name="SafetyFeaturesScreen" component={SafetyFeaturesScreen} />
         <Stack.Screen name="PaymentTerms" component={PaymentTermsScreen} />
+        <Stack.Screen name="About" component={AboutScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

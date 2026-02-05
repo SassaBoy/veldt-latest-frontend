@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   ScrollView,
   Platform,
+  Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -63,10 +64,7 @@ export default function SettingsScreen({ navigation }) {
       'Logout',
       'Are you sure you want to logout?',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Logout',
           style: 'destructive',
@@ -75,7 +73,7 @@ export default function SettingsScreen({ navigation }) {
               await AsyncStorage.removeItem('authToken');
               setIsLoggedIn(false);
               setUserDetails(null);
-              
+
               Toast.show({
                 type: 'success',
                 text1: 'Logged Out',
@@ -104,10 +102,7 @@ export default function SettingsScreen({ navigation }) {
       'Delete Account',
       'Are you sure you want to delete your account? This action cannot be undone.',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
@@ -129,7 +124,7 @@ export default function SettingsScreen({ navigation }) {
                 await AsyncStorage.removeItem('authToken');
                 setIsLoggedIn(false);
                 setUserDetails(null);
-                
+
                 Toast.show({
                   type: 'success',
                   text1: 'Account Deleted',
@@ -160,6 +155,26 @@ export default function SettingsScreen({ navigation }) {
     );
   };
 
+  // ── Same robust profile image URL builder as in UserAccount ─────────────────
+  const getProfileImageUrl = (profileImage) => {
+    if (!profileImage || typeof profileImage !== 'string') {
+      return 'https://service-booking-backend-eb9i.onrender.com/uploads/default-profile.png';
+    }
+
+    const cleanPath = profileImage.replace(/\\/g, '/');
+
+    if (cleanPath.startsWith('http')) {
+      return cleanPath;
+    }
+
+    // If it already has 'uploads/', don't double it
+    const pathPart = cleanPath.startsWith('uploads/')
+      ? cleanPath.substring(7)
+      : cleanPath;
+
+    return `https://service-booking-backend-eb9i.onrender.com/uploads/${pathPart}`;
+  };
+
   const settingsSections = [
     {
       title: 'Account',
@@ -183,8 +198,8 @@ export default function SettingsScreen({ navigation }) {
         {
           icon: 'notifications',
           title: 'Notifications',
-          description: 'Manage notification preferences',
-          onPress: () => console.log('Notifications'),
+          description: 'View and manage notifications',
+          onPress: () => navigation.navigate('NotificationsPage'),
           type: 'navigation',
           iconColor: '#1976d2',
           iconBg: '#e3f2fd',
@@ -207,7 +222,7 @@ export default function SettingsScreen({ navigation }) {
           icon: 'info',
           title: 'About',
           description: 'App version and information',
-          onPress: () => console.log('About'),
+          onPress: () => navigation.navigate('About'),
           type: 'navigation',
           iconColor: '#f57c00',
           iconBg: '#fff3e0',
@@ -243,7 +258,7 @@ export default function SettingsScreen({ navigation }) {
     <SafeAreaView style={styles.safeArea}>
       <Toast />
       <View style={styles.container}>
-        {/* Header Section */}
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -272,13 +287,17 @@ export default function SettingsScreen({ navigation }) {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* User Info Card (if logged in) */}
+          {/* User Info Card – now with real profile pic */}
           {isLoggedIn && userDetails && (
             <View style={styles.userCard}>
               <View style={styles.userAvatarContainer}>
-                <View style={styles.userAvatar}>
-                  <Icon name="person" size={32} color="#1a237e" />
-                </View>
+                <Image
+                  source={{
+                    uri: getProfileImageUrl(userDetails.profileImage),
+                  }}
+                  style={styles.userAvatarImage}
+                  defaultSource={{ uri: 'https://service-booking-backend-eb9i.onrender.com/uploads/default-profile.png' }}
+                />
                 <View style={styles.userStatusBadge}>
                   <Icon name="check-circle" size={16} color="#4caf50" />
                 </View>
@@ -371,20 +390,11 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     paddingHorizontal: 20,
     ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8 },
+      android: { elevation: 4 },
     }),
   },
-  backButton: {
-    marginBottom: 16,
-  },
+  backButton: { marginBottom: 16 },
   backButtonInner: {
     width: 40,
     height: 40,
@@ -393,9 +403,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerContent: {
-    alignItems: 'center',
-  },
+  headerContent: { alignItems: 'center' },
   headerIconContainer: {
     width: 80,
     height: 80,
@@ -428,12 +436,10 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 24,
-  },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 24 },
+
+  // ── Updated User Card with working profile pic ───────────────────────────────
   userCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -446,20 +452,21 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#1a237e',
     ...Platform.select({
-      ios: {
-        shadowColor: '#1a237e',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
+      ios: { shadowColor: '#1a237e', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8 },
+      android: { elevation: 4 },
     }),
   },
   userAvatarContainer: {
     position: 'relative',
     marginRight: 14,
+  },
+  userAvatarImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 3,
+    borderColor: '#1a237e',
+    backgroundColor: '#e0e0e0',
   },
   userAvatar: {
     width: 64,
@@ -482,9 +489,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
-  userInfo: {
-    flex: 1,
-  },
+  userInfo: { flex: 1 },
   userName: {
     fontSize: 18,
     fontWeight: '700',
@@ -512,10 +517,9 @@ const styles = StyleSheet.create({
     color: '#1a237e',
     textTransform: 'uppercase',
   },
-  section: {
-    marginTop: 20,
-    paddingHorizontal: 20,
-  },
+
+  // ── Rest of your styles remain unchanged ────────────────────────────────────
+  section: { marginTop: 20, paddingHorizontal: 20 },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
@@ -523,32 +527,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     letterSpacing: -0.3,
   },
-  sectionContent: {
-    gap: 8,
-  },
+  sectionContent: { gap: 8 },
   settingCard: {
     backgroundColor: '#fff',
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#f0f0f0',
     ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 2,
-      },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 },
+      android: { elevation: 2 },
     }),
   },
-  dangerCard: {
-    borderColor: '#ffebee',
-  },
-  lastCard: {
-    marginBottom: 0,
-  },
+  dangerCard: { borderColor: '#ffebee' },
+  lastCard: { marginBottom: 0 },
   settingCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -562,18 +553,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 14,
   },
-  settingInfo: {
-    flex: 1,
-  },
+  settingInfo: { flex: 1 },
   settingTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1a237e',
     marginBottom: 3,
   },
-  dangerText: {
-    color: '#d32f2f',
-  },
+  dangerText: { color: '#d32f2f' },
   settingDescription: {
     fontSize: 13,
     color: '#666',
@@ -605,4 +592,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-

@@ -70,9 +70,7 @@ const HomeScreen = ({ navigation, route }) => {
     }
   };
   
-  
-
-  
+ 
   const handleLogout = async () => {
     try {
       await AsyncStorage.removeItem("authToken");

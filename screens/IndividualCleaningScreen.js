@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,13 +11,15 @@ import {
   Platform,
   TextInput,
   Dimensions,
+  Animated,
+  Easing,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import axios from 'axios';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 const PRIMARY_COLOR = '#1a237e';
 
 const IndividualCleaningScreen = ({ navigation, route }) => {
@@ -36,6 +38,7 @@ const IndividualCleaningScreen = ({ navigation, route }) => {
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
   const [isTimePickerVisible, setTimePickerVisibility] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [fetchingDetails, setFetchingDetails] = useState(true);
   const [selectedFrequency, setSelectedFrequency] = useState(savedFrequency || 'Every Week');
   const [selectedService, setSelectedService] = useState(
     savedService !== undefined ? savedService : null
@@ -43,13 +46,24 @@ const IndividualCleaningScreen = ({ navigation, route }) => {
   const [date, setDate] = useState(savedDate ? new Date(savedDate) : null);
   const [time, setTime] = useState(savedTime ? new Date(savedTime) : null);
   const [address, setAddress] = useState(savedAddress || '');
-  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
+
+  // Animation states
+  const [showSuccess, setShowSuccess] = useState(false);
+  const checkScale = useRef(new Animated.Value(0)).current;
+  const checkRotate = useRef(new Animated.Value(0)).current;
+  const ringScale1 = useRef(new Animated.Value(0)).current;
+  const ringScale2 = useRef(new Animated.Value(0)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const flashOpacity = useRef(new Animated.Value(0)).current;
+  const sparkleOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     fetchServiceDetails();
   }, []);
 
   const fetchServiceDetails = async () => {
+    setFetchingDetails(true);
     try {
       const response = await axios.get(
         `https://service-booking-backend-eb9i.onrender.com/api/auth/provider-service`,
@@ -65,8 +79,85 @@ const IndividualCleaningScreen = ({ navigation, route }) => {
       }
     } catch (error) {
       console.error('Error fetching service details:', error.message);
-      Alert.alert('Error', 'Could not fetch service details. Please try again later.');
+      Alert.alert('Error', 'Could not load service details. Please try again.');
+    } finally {
+      setFetchingDetails(false);
     }
+  };
+
+  const triggerEpicSuccessAnimation = () => {
+    setShowSuccess(true);
+
+    Animated.parallel([
+      // Overlay fade-in (dramatic dark)
+      Animated.timing(overlayOpacity, {
+        toValue: 0.92,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+      // Quick white flash
+      Animated.sequence([
+        Animated.timing(flashOpacity, {
+          toValue: 0.7,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.timing(flashOpacity, {
+          toValue: 0,
+          duration: 450,
+          useNativeDriver: true,
+        }),
+      ]),
+      // Checkmark explode + spin
+      Animated.parallel([
+        Animated.spring(checkScale, {
+          toValue: 1.15,
+          friction: 3.5,
+          tension: 90,
+          useNativeDriver: true,
+        }),
+        Animated.timing(checkRotate, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.out(Easing.back(2)),
+          useNativeDriver: true,
+        }),
+      ]),
+      // Two shockwave rings
+      Animated.sequence([
+        Animated.timing(ringScale1, {
+          toValue: 2.8,
+          duration: 700,
+          easing: Easing.out(Easing.exp),
+          useNativeDriver: true,
+        }),
+        Animated.timing(ringScale2, {
+          toValue: 3.6,
+          duration: 900,
+          easing: Easing.out(Easing.exp),
+          useNativeDriver: true,
+        }),
+      ]),
+      // Sparkle burst
+      Animated.timing(sparkleOpacity, {
+        toValue: 1,
+        duration: 400,
+        delay: 250,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Auto-navigate after animation
+    setTimeout(() => {
+      setShowSuccess(false);
+      navigation.navigate("ThankYou", {
+        date: date.toISOString(),
+        time: time.toISOString(),
+        selectedService: calculateOptions()[selectedService]?.name,
+        price: calculateOptions()[selectedService]?.price,
+        providerDetails: serviceDetails,
+      });
+    }, 2000);
   };
 
   const handleBookService = async () => {
@@ -75,66 +166,67 @@ const IndividualCleaningScreen = ({ navigation, route }) => {
       const token = await AsyncStorage.getItem("authToken");
 
       if (!token) {
-        Alert.alert("Login First", "You need to log in to book a service.");
-        return navigation.navigate("Login", {
+        Alert.alert("Login Required", "You need to log in to book a service.");
+        navigation.navigate("Login", {
           role: "Client",
           redirectTo: "BookingPage",
           params: {
             ...route.params,
             selectedFrequency,
             selectedService,
-            date,
-            time,
+            date: date?.toISOString(),
+            time: time?.toISOString(),
             address,
           },
         });
+        return;
       }
 
       let userId;
       try {
         const response = await fetch("https://service-booking-backend-eb9i.onrender.com/api/auth/user-details", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         if (response.status === 401) {
-          Alert.alert("Authentication Error", "Session expired. Please log in again.");
+          Alert.alert("Session Expired", "Please log in again.");
           await AsyncStorage.removeItem("authToken");
-          return navigation.navigate("Login");
+          navigation.navigate("Login");
+          return;
         }
 
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.user) {
             userId = data.user.id;
-            console.log("Fetched userId from API:", userId);
           } else {
             throw new Error(data.message || "Failed to fetch user details.");
           }
         } else {
-          throw new Error("Failed to fetch user details. Please try again.");
+          throw new Error("Failed to fetch user details.");
         }
       } catch (fetchError) {
-        console.error("Error fetching user details:", fetchError.message);
-        Alert.alert("Error", "Unable to retrieve user details. Please log in again.");
-        return navigation.navigate("Login");
+        console.error("Error fetching user details:", fetchError);
+        Alert.alert("Error", "Unable to verify your account. Please log in again.");
+        navigation.navigate("Login");
+        return;
       }
 
       if (!userId) {
-        Alert.alert("Error", "User ID is missing. Please log in again.");
-        return navigation.navigate("Login");
+        Alert.alert("Error", "User information is missing. Please log in again.");
+        navigation.navigate("Login");
+        return;
       }
 
       if (!date || !time || selectedService === null) {
-        Alert.alert("Incomplete Details", "Please select a service, date, and time.");
+        Alert.alert("Incomplete Details", "Please select service, date, and time.");
         return;
       }
 
       const selectedOption = calculateOptions()[selectedService];
 
       if (!serviceDetails?.providerId) {
-        Alert.alert("Service Provider Error", "Provider details are missing. Please try again later.");
+        Alert.alert("Error", "Service provider information is missing.");
         return;
       }
 
@@ -148,36 +240,21 @@ const IndividualCleaningScreen = ({ navigation, route }) => {
         address,
       };
 
-      console.log("Booking Data Sent:", bookingData);
-
       const response = await axios.post(
         "https://service-booking-backend-eb9i.onrender.com/api/book/book-service",
         bookingData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
       if (response.data.success) {
-        Alert.alert("Booking Confirmed", "Your booking was successful!");
-        navigation.navigate("ThankYou", {
-          date: date.toISOString(),
-          time: time.toISOString(),
-          selectedService: selectedOption.name,
-          price: selectedOption.price,
-          providerDetails: serviceDetails,
-        });
+        // Launch the epic celebration
+        triggerEpicSuccessAnimation();
       } else {
-        Alert.alert("Error", response.data.message || "Failed to book the service.");
+        Alert.alert("Booking Failed", response.data.message || "Something went wrong.");
       }
     } catch (error) {
-      console.error("Error booking service:", error.message);
-      if (error.response) {
-        console.error("Backend Response:", error.response.data);
-      }
-      Alert.alert("Error", "An unexpected error occurred. Please try again.");
+      console.error("Booking error:", error);
+      Alert.alert("Error", error.response?.data?.message || "Failed to process booking. Try again.");
     } finally {
       setLoading(false);
     }
@@ -215,7 +292,7 @@ const IndividualCleaningScreen = ({ navigation, route }) => {
         });
       } else {
         options.push(
-          { name: `1 Hour of ${serviceName} ${selectedFrequency.toLowerCase()}`, price: price },
+          { name: `1 Hour of ${serviceName} ${selectedFrequency.toLowerCase()}`, price },
           { name: `2 Hours of ${serviceName} ${selectedFrequency.toLowerCase()}`, price: price * 2 },
           { name: `3 Hours of ${serviceName} ${selectedFrequency.toLowerCase()}`, price: price * 3 },
           { name: `5 Hours of ${serviceName} ${selectedFrequency.toLowerCase()}`, price: price * 5 }
@@ -242,223 +319,230 @@ const IndividualCleaningScreen = ({ navigation, route }) => {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header with Image */}
         <View style={styles.header}>
-          {imageLoading && (
+          {fetchingDetails ? (
             <View style={styles.imagePlaceholder}>
               <ActivityIndicator size="large" color={PRIMARY_COLOR} />
             </View>
+          ) : (
+            <Image
+              source={{
+                uri: serviceDetails?.imageUrl || 'https://via.placeholder.com/400x250?text=Service',
+              }}
+              style={styles.headerImage}
+              resizeMode="cover"
+            />
           )}
-          <Image
-            source={{
-              uri: serviceDetails?.imageUrl || 'https://via.placeholder.com/400x250',
-            }}
-            style={styles.headerImage}
-            onLoadStart={() => setImageLoading(true)}
-            onLoadEnd={() => setImageLoading(false)}
-            resizeMode="cover"
-            defaultSource={require('../assets/default-profile.png')}
-          />
         </View>
 
         {/* Content */}
         <View style={styles.content}>
-          {/* Service Info Card */}
-          <View style={styles.serviceInfoCard}>
-            <Text style={styles.title}>{serviceName}</Text>
-            <View style={styles.ratingContainer}>
-              <View style={styles.ratingBadge}>
-                <Icon name="star" size={20} color="#FFA000" />
-                <Text style={styles.rating}>{route.params?.averageRating || "0.0"}</Text>
-              </View>
-              <Text style={styles.reviewCount}>
-                {route.params?.reviewCount || 0} {route.params?.reviewCount === 1 ? "review" : "reviews"}
-              </Text>
+          {fetchingDetails ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={PRIMARY_COLOR} />
+              <Text style={styles.loadingText}>Loading service details...</Text>
             </View>
-          </View>
-
-          {/* Frequency Selection */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Icon name="repeat" size={22} color={PRIMARY_COLOR} />
-              <Text style={styles.sectionTitle}>Service Frequency</Text>
-            </View>
-            <View style={styles.frequencyContainer}>
-              {['Every Week', 'Bi-Weekly', 'One Time'].map((frequency) => (
-                <TouchableOpacity
-                  key={frequency}
-                  style={[
-                    styles.frequencyButton,
-                    selectedFrequency === frequency && styles.frequencyButtonSelected,
-                  ]}
-                  onPress={() => handleFrequencyChange(frequency)}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.frequencyButtonText,
-                      selectedFrequency === frequency && styles.frequencyButtonTextSelected,
-                    ]}
-                  >
-                    {frequency}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Service Options */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Icon name="cleaning-services" size={22} color={PRIMARY_COLOR} />
-              <Text style={styles.sectionTitle}>Service Options</Text>
-            </View>
-            <View style={styles.serviceContainer}>
-              {serviceOptions.map((option, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.serviceOption,
-                    selectedService === index && styles.serviceOptionSelected,
-                  ]}
-                  onPress={() => handleServiceSelect(index)}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.serviceOptionContent}>
-                    <View style={styles.serviceOptionIcon}>
-                      <Icon
-                        name={selectedService === index ? "check-circle" : "radio-button-unchecked"}
-                        size={24}
-                        color={selectedService === index ? "#fff" : PRIMARY_COLOR}
-                      />
-                    </View>
-                    <View style={styles.serviceOptionDetails}>
-                      <Text
-                        style={[
-                          styles.serviceOptionName,
-                          selectedService === index && styles.serviceOptionNameSelected,
-                        ]}
-                      >
-                        {option.name}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.serviceOptionPrice,
-                          selectedService === index && styles.serviceOptionPriceSelected,
-                        ]}
-                      >
-                        NAD {option.price}
-                      </Text>
-                    </View>
+          ) : (
+            <>
+              {/* Service Info Card */}
+              <View style={styles.serviceInfoCard}>
+                <Text style={styles.title}>{serviceName}</Text>
+                <View style={styles.ratingContainer}>
+                  <View style={styles.ratingBadge}>
+                    <Icon name="star" size={20} color="#FFA000" />
+                    <Text style={styles.rating}>{route.params?.averageRating || "0.0"}</Text>
                   </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Date & Time Selection */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Icon name="schedule" size={22} color={PRIMARY_COLOR} />
-              <Text style={styles.sectionTitle}>Schedule</Text>
-            </View>
-            <View style={styles.dateTimeContainer}>
-              <TouchableOpacity
-                onPress={() => setDatePickerVisibility(true)}
-                style={styles.dateTimeButton}
-                activeOpacity={0.8}
-              >
-                <Icon name="calendar-today" size={22} color={PRIMARY_COLOR} />
-                <View style={styles.dateTimeContent}>
-                  <Text style={styles.dateTimeLabel}>Date</Text>
-                  <Text style={styles.dateTimeValue}>
-                    {date ? date.toLocaleDateString() : 'Select Date'}
+                  <Text style={styles.reviewCount}>
+                    {route.params?.reviewCount || 0} {route.params?.reviewCount === 1 ? "review" : "reviews"}
                   </Text>
                 </View>
-              </TouchableOpacity>
+              </View>
 
+              {/* Frequency Selection */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Icon name="repeat" size={22} color={PRIMARY_COLOR} />
+                  <Text style={styles.sectionTitle}>Service Frequency</Text>
+                </View>
+                <View style={styles.frequencyContainer}>
+                  {['Every Week', 'Bi-Weekly', 'One Time'].map((frequency) => (
+                    <TouchableOpacity
+                      key={frequency}
+                      style={[
+                        styles.frequencyButton,
+                        selectedFrequency === frequency && styles.frequencyButtonSelected,
+                      ]}
+                      onPress={() => handleFrequencyChange(frequency)}
+                      activeOpacity={0.8}
+                    >
+                      <Text
+                        style={[
+                          styles.frequencyButtonText,
+                          selectedFrequency === frequency && styles.frequencyButtonTextSelected,
+                        ]}
+                      >
+                        {frequency}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Service Options */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Icon name="cleaning-services" size={22} color={PRIMARY_COLOR} />
+                  <Text style={styles.sectionTitle}>Service Options</Text>
+                </View>
+                <View style={styles.serviceContainer}>
+                  {serviceOptions.map((option, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.serviceOption,
+                        selectedService === index && styles.serviceOptionSelected,
+                      ]}
+                      onPress={() => handleServiceSelect(index)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.serviceOptionContent}>
+                        <View style={styles.serviceOptionIcon}>
+                          <Icon
+                            name={selectedService === index ? "check-circle" : "radio-button-unchecked"}
+                            size={24}
+                            color={selectedService === index ? "#fff" : PRIMARY_COLOR}
+                          />
+                        </View>
+                        <View style={styles.serviceOptionDetails}>
+                          <Text
+                            style={[
+                              styles.serviceOptionName,
+                              selectedService === index && styles.serviceOptionNameSelected,
+                            ]}
+                          >
+                            {option.name}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.serviceOptionPrice,
+                              selectedService === index && styles.serviceOptionPriceSelected,
+                            ]}
+                          >
+                            NAD {option.price}
+                          </Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Date & Time Selection */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Icon name="schedule" size={22} color={PRIMARY_COLOR} />
+                  <Text style={styles.sectionTitle}>Schedule</Text>
+                </View>
+                <View style={styles.dateTimeContainer}>
+                  <TouchableOpacity
+                    onPress={() => setDatePickerVisibility(true)}
+                    style={styles.dateTimeButton}
+                    activeOpacity={0.8}
+                  >
+                    <Icon name="calendar-today" size={22} color={PRIMARY_COLOR} />
+                    <View style={styles.dateTimeContent}>
+                      <Text style={styles.dateTimeLabel}>Date</Text>
+                      <Text style={styles.dateTimeValue}>
+                        {date ? date.toLocaleDateString() : 'Select Date'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setTimePickerVisibility(true)}
+                    style={styles.dateTimeButton}
+                    activeOpacity={0.8}
+                  >
+                    <Icon name="access-time" size={22} color={PRIMARY_COLOR} />
+                    <View style={styles.dateTimeContent}>
+                      <Text style={styles.dateTimeLabel}>Time</Text>
+                      <Text style={styles.dateTimeValue}>
+                        {time ? time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Select Time'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Address Input */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Icon name="location-on" size={22} color={PRIMARY_COLOR} />
+                  <Text style={styles.sectionTitle}>Service Location</Text>
+                </View>
+                <View style={styles.addressContainer}>
+                  <Icon name="home" size={20} color={PRIMARY_COLOR} style={styles.addressIcon} />
+                  <TextInput
+                    style={styles.addressInput}
+                    placeholder="Enter your full address"
+                    placeholderTextColor="#999"
+                    value={address}
+                    onChangeText={setAddress}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+              </View>
+
+              {/* Booking Summary */}
+              {isFormValid && (
+                <View style={styles.summaryCard}>
+                  <View style={styles.summaryHeader}>
+                    <Icon name="receipt" size={22} color={PRIMARY_COLOR} />
+                    <Text style={styles.summaryTitle}>Booking Summary</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Service:</Text>
+                    <Text style={styles.summaryValue}>{serviceOptions[selectedService]?.name}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Date:</Text>
+                    <Text style={styles.summaryValue}>{date?.toLocaleDateString()}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Time:</Text>
+                    <Text style={styles.summaryValue}>
+                      {time?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                  <View style={styles.summaryDivider} />
+                  <View style={styles.summaryTotalRow}>
+                    <Text style={styles.summaryTotalLabel}>Total Price:</Text>
+                    <Text style={styles.summaryTotalValue}>NAD {serviceOptions[selectedService]?.price}</Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Book Button */}
               <TouchableOpacity
-                onPress={() => setTimePickerVisibility(true)}
-                style={styles.dateTimeButton}
+                style={[
+                  styles.bookButton,
+                  !isFormValid && styles.bookButtonDisabled,
+                ]}
+                onPress={handleBookService}
+                disabled={loading || !isFormValid}
                 activeOpacity={0.8}
               >
-                <Icon name="access-time" size={22} color={PRIMARY_COLOR} />
-                <View style={styles.dateTimeContent}>
-                  <Text style={styles.dateTimeLabel}>Time</Text>
-                  <Text style={styles.dateTimeValue}>
-                    {time ? time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Select Time'}
-                  </Text>
-                </View>
+                {loading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Icon name="event-available" size={22} color="#fff" />
+                    <Text style={styles.bookButtonText}>Confirm Booking</Text>
+                  </>
+                )}
               </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Address Input */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Icon name="location-on" size={22} color={PRIMARY_COLOR} />
-              <Text style={styles.sectionTitle}>Service Location</Text>
-            </View>
-            <View style={styles.addressContainer}>
-              <Icon name="home" size={20} color={PRIMARY_COLOR} style={styles.addressIcon} />
-              <TextInput
-                style={styles.addressInput}
-                placeholder="Enter your full address"
-                placeholderTextColor="#999"
-                value={address}
-                onChangeText={setAddress}
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-          </View>
-
-          {/* Booking Summary */}
-          {isFormValid && (
-            <View style={styles.summaryCard}>
-              <View style={styles.summaryHeader}>
-                <Icon name="receipt" size={22} color={PRIMARY_COLOR} />
-                <Text style={styles.summaryTitle}>Booking Summary</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Service:</Text>
-                <Text style={styles.summaryValue}>{serviceOptions[selectedService]?.name}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Date:</Text>
-                <Text style={styles.summaryValue}>{date?.toLocaleDateString()}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Time:</Text>
-                <Text style={styles.summaryValue}>
-                  {time?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </View>
-              <View style={styles.summaryDivider} />
-              <View style={styles.summaryTotalRow}>
-                <Text style={styles.summaryTotalLabel}>Total Price:</Text>
-                <Text style={styles.summaryTotalValue}>NAD {serviceOptions[selectedService]?.price}</Text>
-              </View>
-            </View>
+            </>
           )}
-
-          {/* Book Button */}
-          <TouchableOpacity
-            style={[
-              styles.bookButton,
-              !isFormValid && styles.bookButtonDisabled,
-            ]}
-            onPress={handleBookService}
-            disabled={loading || !isFormValid}
-            activeOpacity={0.8}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <>
-                <Icon name="event-available" size={22} color="#fff" />
-                <Text style={styles.bookButtonText}>Confirm Booking</Text>
-              </>
-            )}
-          </TouchableOpacity>
         </View>
 
         {/* Date/Time Pickers */}
@@ -476,6 +560,85 @@ const IndividualCleaningScreen = ({ navigation, route }) => {
           onCancel={() => setTimePickerVisibility(false)}
         />
       </ScrollView>
+
+      {/* === Premium Celebration Animation Overlay === */}
+      {showSuccess && (
+        <Animated.View style={StyleSheet.absoluteFill}>
+          {/* Dark cinematic overlay */}
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: '#1a237e', opacity: overlayOpacity },
+            ]}
+          />
+
+          {/* Bright victory flash */}
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: '#ffffff', opacity: flashOpacity },
+            ]}
+          />
+
+          {/* Outer shockwave ring */}
+          <Animated.View
+            style={[
+              styles.ringOuter,
+              { transform: [{ scale: ringScale1 }] },
+            ]}
+          />
+
+          {/* Inner glowing ring */}
+          <Animated.View
+            style={[
+              styles.ringInner,
+              { transform: [{ scale: ringScale2 }] },
+            ]}
+          />
+
+          {/* Massive glowing checkmark with spin */}
+          <Animated.View
+            style={[
+              styles.checkContainer,
+              {
+                transform: [
+                  { scale: checkScale },
+                  {
+                    rotate: checkRotate.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '360deg'],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <Icon name="check-circle" size={200} color="#fff" />
+          </Animated.View>
+
+          {/* Sparkle burst (small animated dots) */}
+          <Animated.View style={[styles.sparkles, { opacity: sparkleOpacity }]}>
+            {[...Array(16)].map((_, i) => (
+              <Animated.View
+                key={i}
+                style={[
+                  styles.sparkle,
+                  {
+                    transform: [
+                      {
+                        translateX: Math.sin(i * 22.5) * 140,
+                      },
+                      {
+                        translateY: Math.cos(i * 22.5) * 140,
+                      },
+                    ],
+                  },
+                ]}
+              />
+            ))}
+          </Animated.View>
+        </Animated.View>
+      )}
 
       {/* Loading Overlay */}
       {loading && (
@@ -516,6 +679,18 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     backgroundColor: '#f8f9fc',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: PRIMARY_COLOR,
+    fontWeight: '600',
   },
   serviceInfoCard: {
     backgroundColor: '#fff',
@@ -877,6 +1052,49 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     letterSpacing: 0.3,
+  },
+
+  // ── Epic Celebration Animation Styles ────────────────────────────────────────
+  ringOuter: {
+    width: 600,
+    height: 600,
+    borderRadius: 300,
+    borderWidth: 10,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+    position: 'absolute',
+  },
+  ringInner: {
+    width: 420,
+    height: 420,
+    borderRadius: 210,
+    borderWidth: 12,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
+    position: 'absolute',
+  },
+  checkContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.6,
+    shadowRadius: 30,
+    elevation: 25,
+  },
+  sparkles: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sparkle: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#fff',
+    opacity: 0.9,
   },
 });
 
